@@ -57,6 +57,9 @@ const FACEBOOK_COMMENT_BOX_SELECTOR = [
   'div[role="textbox"][contenteditable="true"][aria-placeholder*="Escribe un comentario"]',
   'div[aria-label*="Write a comment"]',
   'div[aria-label*="Escribe un comentario"]',
+  'div[role="textbox"][contenteditable="true"][aria-label*="yorum yaz" i]',
+  'div[role="textbox"][contenteditable="true"][aria-placeholder*="yorum yaz" i]',
+  'div[aria-label*="yorum yaz" i]',
   'form div[role="textbox"][contenteditable="true"]',
 ].join(", ");
 
@@ -70,7 +73,7 @@ const FACEBOOK_COMMENT_BOX_SELECTOR = [
  * ninguno, el panel nunca se abría, y el fallo aparecía un paso más tarde: como
  * un timeout de la caja de texto, que efectivamente no existía todavía.
  */
-const FACEBOOK_COMMENT_OPEN_LABELS = ["Comentario", "Comentar", "Comment"];
+const FACEBOOK_COMMENT_OPEN_LABELS = ["Comentario", "Comentar", "Comment", "Yorum"];
 
 const FACEBOOK_COMMENT_OPEN_SELECTOR = FACEBOOK_COMMENT_OPEN_LABELS.flatMap((label) => [
   `[role="button"][aria-label*="${label}"]`,
@@ -123,6 +126,8 @@ const FACEBOOK_LIKE_LABELS = [
   "Reagir",
   "Mi piace",
   "Gefällt mir",
+  "Beğen",
+  "Tepki ver",
 ];
 
 /** Las que aparecen cuando la reacción YA está puesta — señal de trabajo hecho. */
@@ -136,6 +141,8 @@ const FACEBOOK_UNLIKE_LABELS = [
   "Descurtir",
   "Remover Curtir",
   "Non mi piace più",
+  "Beğenmekten vazgeç",
+  "Beğenmeyi geri al",
 ];
 
 /** Las cinco formas en que Facebook expone el mismo botón según el layout. */
@@ -219,6 +226,8 @@ const FACEBOOK_LIKE_ARIA_PATTERNS = [
   "^curtir$",
   "^mi piace$",
   "^gefallt mir$",
+  "^begen$",
+  "^tepki ver",
 ];
 
 /**
@@ -241,6 +250,8 @@ const FACEBOOK_UNLIKE_ARIA_PATTERNS = [
   "retirer j'aime",
   "non mi piace piu",
   "gefallt mir nicht mehr",
+  "begenmekten vazgec",
+  "begenmeyi geri al",
 ];
 
 /** Los vecinos que delatan a la barra de acciones de una publicación. */
@@ -255,6 +266,9 @@ const FACEBOOK_ACTION_ROW_LABELS = [
   "Compartilhar",
   "Condividi",
   "Teilen",
+  "Yorum yap",
+  "Yorum",
+  "Paylaş",
 ];
 
 /** Cómo se rotula el botón de responder, por idioma de la interfaz. */
@@ -265,7 +279,7 @@ const FACEBOOK_ACTION_ROW_LABELS = [
  * y esos aparecen también alrededor de un comentario ("Escribe un comentario",
  * "Comentar como X"), así que como señal valen menos.
  */
-const FACEBOOK_SHARE_LABELS = ["Compartir", "Share", "Partager", "Compartilhar", "Condividi", "Teilen"];
+const FACEBOOK_SHARE_LABELS = ["Compartir", "Share", "Partager", "Compartilhar", "Condividi", "Teilen", "Paylaş"];
 
 /**
  * Cómo se presenta el contenedor de un comentario. Facebook le pone al
@@ -289,6 +303,7 @@ const FACEBOOK_REPLY_LABELS = [
   "Rispondi",
   "Antworten",
   "Responder a",
+  "Yanıtla",
 ];
 
 /** El mismo truco del marcado, para el botón de responder. Ver FACEBOOK_COMMENT_LIKE_MARK. */
@@ -320,6 +335,9 @@ const FACEBOOK_MORE_COMMENTS_SELECTOR = [
   "respuesta más",
   "respuestas más",
   "more replies",
+  "daha fazla yorum",
+  "önceki yorumlar",
+  "daha fazla yanıt",
 ]
   .map((text) => `div[role="button"]:has-text("${text}")`)
   .join(", ");
@@ -404,7 +422,7 @@ async function assertNoKnownBlocker(page: Page) {
 }
 
 function isFacebookCommentBoxSelector(selector: string) {
-  return /Write a comment|Escribe un comentario/i.test(selector);
+  return /Write a comment|Escribe un comentario|yorum yaz/i.test(selector);
 }
 
 function isFacebookLikeSelector(selector: string) {

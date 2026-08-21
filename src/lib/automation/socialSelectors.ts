@@ -34,6 +34,8 @@ export const FACEBOOK_REACTION_TRIGGER_SELECTOR = selectorForAriaLabels([
   "React",
   "Reaccionar",
   "Reacciona",
+  "Beğen",
+  "Tepki ver",
 ]);
 
 export const FACEBOOK_COMMENT_BOX_SELECTOR = [
@@ -43,13 +45,16 @@ export const FACEBOOK_COMMENT_BOX_SELECTOR = [
   'div[role="textbox"][contenteditable="true"][aria-placeholder*="Escribe un comentario"]',
   'div[aria-label*="Write a comment"]',
   'div[aria-label*="Escribe un comentario"]',
+  'div[role="textbox"][contenteditable="true"][aria-label*="yorum yaz" i]',
+  'div[role="textbox"][contenteditable="true"][aria-placeholder*="yorum yaz" i]',
+  'div[aria-label*="yorum yaz" i]',
   'form div[role="textbox"][contenteditable="true"]',
 ].join(", ");
 
 /** Presets del botón de reacción, por plataforma. */
 export const REACTION_PRESETS: Record<string, { label: string; selector: string }> = {
   facebook: { label: "Facebook", selector: FACEBOOK_REACTION_TRIGGER_SELECTOR },
-  instagram: { label: "Instagram", selector: 'svg[aria-label="Like"], svg[aria-label="Me gusta"]' },
+  instagram: { label: "Instagram", selector: 'svg[aria-label="Like"], svg[aria-label="Me gusta"], svg[aria-label="Beğen"]' },
   tiktok: { label: "TikTok", selector: '[data-e2e="like-icon"]' },
   x: { label: "X / Twitter", selector: '[data-testid="like"]' },
   custom: { label: "Personalizado", selector: "" },
@@ -96,12 +101,12 @@ export const COMMENT_PRESETS: Record<string, CommentPreset> = {
 // plataformas solo tienen like/no-like.
 export const REACTIONS: { key: string; label: string; ariaLabels?: string[] }[] = [
   { key: "like", label: "👍 Me gusta (default)" },
-  { key: "love", label: "❤️ Me encanta", ariaLabels: ["Me encanta", "Love"] },
-  { key: "care", label: "🤗 Me importa", ariaLabels: ["Me importa", "Care"] },
+  { key: "love", label: "❤️ Me encanta", ariaLabels: ["Me encanta", "Love", "Süper"] },
+  { key: "care", label: "🤗 Me importa", ariaLabels: ["Me importa", "Care", "Güçlü"] },
   { key: "haha", label: "😆 Me divierte", ariaLabels: ["Me divierte", "Haha"] },
-  { key: "wow", label: "😮 Me asombra", ariaLabels: ["Me asombra", "Wow"] },
-  { key: "sad", label: "😢 Me entristece", ariaLabels: ["Me entristece", "Sad"] },
-  { key: "angry", label: "😡 Me enoja", ariaLabels: ["Me enoja", "Angry"] },
+  { key: "wow", label: "😮 Me asombra", ariaLabels: ["Me asombra", "Wow", "Vay"] },
+  { key: "sad", label: "😢 Me entristece", ariaLabels: ["Me entristece", "Sad", "Hüzünlü"] },
+  { key: "angry", label: "😡 Me enoja", ariaLabels: ["Me enoja", "Angry", "Kızgın"] },
 ];
 
 /** Vacío para "like": ese no abre el picker, se clickea el botón directo. */
