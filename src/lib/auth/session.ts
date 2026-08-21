@@ -8,7 +8,7 @@
 // Usa WebCrypto a propósito (no `node:crypto`): este módulo lo importa
 // proxy.ts, que corre en el runtime Edge, donde `node:crypto` no existe.
 
-export const SESSION_COOKIE = "godeye_session";
+export const SESSION_COOKIE = "jesusgarcia_session";
 
 export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
