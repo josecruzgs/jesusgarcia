@@ -222,16 +222,51 @@ dicen—, que no siempre es el 3002.
 
 ### Actualizar el código ya desplegado
 
-```bash
-cd ~/jesusgarcia
-git pull
-npm ci            # solo si cambiaron dependencias
-npm run build
-pm2 restart <el-nombre-que-diga-pm2-list>
+Desde PowerShell, empezando de cero. Primero se sube lo que se hizo en la
+máquina:
+
+```powershell
+cd C:UsersjosecDocumentsGithubjesusgarcia
+git add -A
+git commit -m "lo que se cambió"
+git push
 ```
 
-`npm run build` es lo más pesado que corre en el VPS: con menos de 2 GB libres
-muere por memoria (ver el swap de la sección 2).
+Y después se baja en el servidor. **Como `burgueno`, no como root**: entrar por
+root deja los archivos con dueño equivocado y usa otro PM2, donde estos
+procesos no existen.
+
+```powershell
+ssh burgueno@177.7.33.214
+```
+
+```bash
+free -h                 # menos de 2 GB disponibles: no compilar acá
+cd ~/jesusgarcia
+git pull
+npm ci                  # solo si cambiaron dependencias
+npm run build
+pm2 restart jesusgarcia-web jesusgarcia-listening
+```
+
+`.env.local` no viaja por git. Si cambió, va aparte, desde PowerShell:
+
+```powershell
+scp .env.local burgueno@177.7.33.214:~/jesusgarcia/.env.local
+```
+
+Comprobación, en el servidor:
+
+```bash
+pm2 list
+curl -s -o /dev/null -w %{http_code}n http://127.0.0.1:3002/login
+```
+
+200 y los procesos en `online` sin que suba el contador de reinicios.
+
+`npm run build` es lo más pesado que corre en el VPS, y no está solo: comparte
+máquina con el panel de Ismael Burgueño. Si no hay memoria, el kernel mata
+procesos para liberar y puede elegir los del otro panel.
 
 ## 6. AdsPower en el VPS
 
