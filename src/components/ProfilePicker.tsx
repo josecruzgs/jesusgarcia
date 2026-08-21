@@ -5,6 +5,7 @@ import { Search } from "lucide-react";
 import StatusBadge from "@/components/StatusBadge";
 import Pagination from "@/components/Pagination";
 import type { Tag } from "@/components/TagBadge";
+import { hasCheckTag } from "@/lib/checkTag";
 
 const PAGE_SIZE = 20;
 
@@ -59,7 +60,7 @@ export default function ProfilePicker({
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return profiles.filter((p) => {
+    const visibles = profiles.filter((p) => {
       if (q && !p.name.toLowerCase().includes(q)) return false;
       if (groupFilter && p.groupId !== groupFilter) return false;
       if (platformFilter && p.platform !== platformFilter) return false;
@@ -69,6 +70,16 @@ export default function ProfilePicker({
       if (ageMax !== undefined && (p.age == null || p.age > ageMax)) return false;
       return true;
     });
+
+    // Los de la palomita arriba. No es un filtro —siguen estando todos— sino
+    // el orden en que conviene verlos: son los perfiles ya probados, y como la
+    // lista pagina de veinte en veinte, sin esto los buenos quedan repartidos
+    // por páginas que nadie llega a abrir.
+    //
+    // Dos pasadas en vez de un sort con comparador: `sort` también serviría,
+    // pero partir la lista deja explícito que dentro de cada mitad no se toca
+    // el orden que ya traía.
+    return [...visibles.filter((p) => hasCheckTag(p.tags)), ...visibles.filter((p) => !hasCheckTag(p.tags))];
   }, [profiles, search, groupFilter, platformFilter, genderFilter, tagFilter, ageMin, ageMax]);
 
   useEffect(() => {

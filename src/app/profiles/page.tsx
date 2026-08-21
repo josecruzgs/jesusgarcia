@@ -5,6 +5,7 @@ import Link from "next/link";
 import { RefreshCw, Search, Plus, Trash2 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useSession } from "@/lib/session";
+import { findCheckTag } from "@/lib/checkTag";
 import StatusBadge from "@/components/StatusBadge";
 import Pagination from "@/components/Pagination";
 import Card from "@/components/Card";
@@ -60,12 +61,6 @@ async function requestProfileDelete(id: string, localOnly = false) {
 // AdsPower marca con un check en la etiqueta los perfiles ya listos para
 // usar. Es la vista con la que se quiere entrar a la tabla, asi que el filtro
 // de etiquetas arranca con esa etiqueta puesta (se puede quitar a mano).
-const CHECK_TAG_PATTERN = /[✅✔☑✓]/;
-
-function findCheckTag(tags: Tag[]) {
-  return tags.find((t) => CHECK_TAG_PATTERN.test(t.name))?.name ?? "";
-}
-
 export default function ProfilesPage() {
   const session = useSession();
   const [profiles, setProfiles] = useState<Profile[]>([]);
