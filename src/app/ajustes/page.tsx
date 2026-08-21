@@ -8,7 +8,7 @@ import Card from "@/components/Card";
 import { useSession } from "@/lib/session";
 import { CITIES, findCity } from "@/lib/timezones";
 
-const HOUSE_ACCENT = "#8a6a28";
+const HOUSE_ACCENT = "#2f5f86";
 const HOUSE_TITLE = "Jesús García";
 
 const AVATAR_SIZE = 256;
@@ -122,7 +122,7 @@ export default function AjustesPage() {
         <div>
           <h2 className="font-display text-lg font-semibold text-ink">Colores</h2>
           <p className="mt-1 text-[13px] text-ink-secondary">
-            El acento reemplaza el oro de la casa en botones, cifras y enlaces. Los cuatro elementos
+            El acento reemplaza el azul acero de la casa en botones, cifras y enlaces. Los cuatro elementos
             —Agua, Viento, Tierra y Fuego— conservan su color en sus propias pantallas: es la señal de
             en qué sección estás.
           </p>

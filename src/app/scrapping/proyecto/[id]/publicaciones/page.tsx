@@ -247,7 +247,7 @@ export default function PublicacionesPage({ params }: { params: Promise<{ id: st
     <div className="flex animate-fade-in-up flex-col gap-5">
       <Link
         href={`/scrapping/proyecto/${id}`}
-        className="label-mono-sm inline-flex w-fit items-center gap-1.5 transition-colors hover:text-gold"
+        className="label-mono-sm inline-flex w-fit items-center gap-1.5 transition-colors hover:text-steel"
       >
         <ArrowLeft className="h-3.5 w-3.5" /> {project?.name ?? "Proyecto"}
       </Link>

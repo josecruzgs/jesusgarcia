@@ -266,7 +266,7 @@ export default function ProjectForm({
       <button
         type="button"
         onClick={() => setAdvanced((v) => !v)}
-        className="label-mono self-start transition-colors hover:text-gold"
+        className="label-mono self-start transition-colors hover:text-steel"
       >
         {advanced ? "− Ocultar" : "+ Mostrar"} filtros y ajustes avanzados
       </button>

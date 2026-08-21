@@ -61,7 +61,7 @@ type NamedRow = {
 // quitaron los colores por sección resuelven todos al mismo acento y habrían
 // dejado tres redes pintadas igual.
 const PLATFORM_META: Record<string, { label: string; color: string }> = {
-  news: { label: "Prensa y web", color: "var(--gold)" },
+  news: { label: "Prensa y web", color: "var(--steel)" },
   x: { label: "X (Twitter)", color: "var(--series-6)" },
   instagram: { label: "Instagram", color: "var(--series-3)" },
   tiktok: { label: "TikTok", color: "var(--teal)" },
@@ -519,7 +519,7 @@ export default function ProyectoPage({ params }: { params: Promise<{ id: string 
         <div className="min-w-0">
           <Link
             href="/scrapping"
-            className="label-mono-sm inline-flex items-center gap-1.5 transition-colors hover:text-gold"
+            className="label-mono-sm inline-flex items-center gap-1.5 transition-colors hover:text-steel"
           >
             <ArrowLeft className="h-3.5 w-3.5" /> Escucha
           </Link>
@@ -729,7 +729,7 @@ export default function ProyectoPage({ params }: { params: Promise<{ id: string 
           col={4}
           title="Share of voice"
           tag="por figura"
-          accent="var(--gold)"
+          accent="var(--steel)"
           icon={<ElementIcon name="eye" size={13} />}
         >
           {(stats?.byEntity.length ?? 0) === 0 ? (
@@ -795,7 +795,7 @@ export default function ProyectoPage({ params }: { params: Promise<{ id: string 
                 </thead>
                 <tbody>
                   {stats!.byPlatform.map((row) => {
-                    const meta = PLATFORM_META[row.name] ?? { label: row.name, color: "var(--gold)" };
+                    const meta = PLATFORM_META[row.name] ?? { label: row.name, color: "var(--steel)" };
                     const tone = scoreTone(row.avgScore);
                     return (
                       <tr key={row.name} className="border-b border-hairline last:border-0">
@@ -853,7 +853,7 @@ export default function ProyectoPage({ params }: { params: Promise<{ id: string 
           col={12}
           title="Resumen ejecutivo"
           tag={`cada ${schedule?.windowDays ?? 3} días · Claude`}
-          accent="var(--gold)"
+          accent="var(--steel)"
           icon={<Sparkles className="h-3.5 w-3.5" />}
           right={
             <div className="flex items-center gap-2">
@@ -900,7 +900,7 @@ export default function ProyectoPage({ params }: { params: Promise<{ id: string 
               <div className="flex flex-wrap items-center gap-2">
                 <span className="label-mono">Períodos de {schedule.windowDays} días</span>
                 {briefProgress && (
-                  <span className="label-mono-sm normal-case tracking-normal text-gold">
+                  <span className="label-mono-sm normal-case tracking-normal text-steel">
                     {briefProgress}
                   </span>
                 )}
@@ -962,7 +962,7 @@ export default function ProyectoPage({ params }: { params: Promise<{ id: string 
                     <button
                       onClick={() => generateWindow(String(brief.windowStart).slice(0, 10))}
                       disabled={busy !== null}
-                      className="underline transition-colors hover:text-gold"
+                      className="underline transition-colors hover:text-steel"
                     >
                       rehacer
                     </button>
@@ -986,7 +986,7 @@ export default function ProyectoPage({ params }: { params: Promise<{ id: string 
                     <BriefList
                       title="Recomendaciones"
                       items={brief.recommendations}
-                      color="var(--gold)"
+                      color="var(--steel)"
                       fallbackIcon="comunicacion"
                     />
                   </div>
@@ -994,7 +994,7 @@ export default function ProyectoPage({ params }: { params: Promise<{ id: string 
               ) : (
                 <button
                   onClick={() => setBriefOpen(true)}
-                  className="label-mono self-start transition-colors hover:text-gold"
+                  className="label-mono self-start transition-colors hover:text-steel"
                 >
                   {brief.risks.length} riesgos · {brief.opportunities.length} oportunidades ·{" "}
                   {brief.recommendations.length} recomendaciones — ver completo →
@@ -1161,12 +1161,12 @@ function WindowStrip({
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {hidden > 0 && (
-        <button onClick={onToggleExpand} className="label-mono transition-colors hover:text-gold">
+        <button onClick={onToggleExpand} className="label-mono transition-colors hover:text-steel">
           +{hidden} anteriores
         </button>
       )}
       {expanded && windows.length > VISIBLE_WINDOWS && (
-        <button onClick={onToggleExpand} className="label-mono transition-colors hover:text-gold">
+        <button onClick={onToggleExpand} className="label-mono transition-colors hover:text-steel">
           − contraer
         </button>
       )}
@@ -1190,11 +1190,11 @@ function WindowStrip({
             ? "border-dashed border-amber/55 text-amber"
             : active
               ? "accent-fill"
-              : "border-gold/40 text-ink-secondary hover:text-ink"
+              : "border-steel/40 text-ink-secondary hover:text-ink"
           : empty
             ? "border-dashed border-hairline text-ink-muted opacity-45"
             : window.closed
-              ? "border-dashed border-hairline text-ink-secondary hover:border-gold/50 hover:text-gold"
+              ? "border-dashed border-hairline text-ink-secondary hover:border-steel/50 hover:text-steel"
               : "border-dotted border-viento/55 text-viento";
 
         return (

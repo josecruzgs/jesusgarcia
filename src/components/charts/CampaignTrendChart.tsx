@@ -9,10 +9,10 @@ export type TrendPoint = { day: string; label: string; likes: number; comments: 
 
 // Paleta categórica, no colores de elemento: las dos series tienen que
 // distinguirse entre sí, y --el-agua ahora resuelve al mismo acento que
-// --gold (ver globals.css), lo que dejaba las dos curvas del mismo color.
+// --steel (ver globals.css), lo que dejaba las dos curvas del mismo color.
 const SERIES = [
   { key: "likes", name: "Likes completados", color: "var(--series-1)" },
-  { key: "comments", name: "Comentarios completados", color: "var(--gold)" },
+  { key: "comments", name: "Comentarios completados", color: "var(--steel)" },
 ] as const;
 
 function ChartTooltip({ active, payload, label }: TooltipContentProps) {
@@ -52,7 +52,7 @@ export default function CampaignTrendChart({ data }: { data: TrendPoint[] }) {
         <button
           type="button"
           onClick={() => setShowTable((s) => !s)}
-          className="font-mono text-[10px] uppercase tracking-[0.08em] text-ink-muted transition-colors hover:text-gold"
+          className="font-mono text-[10px] uppercase tracking-[0.08em] text-ink-muted transition-colors hover:text-steel"
         >
           {showTable ? "Ver gráfico" : "Ver como tabla"}
         </button>

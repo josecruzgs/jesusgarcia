@@ -1,4 +1,4 @@
-// Separador de sección dentro de un bento: etiqueta mono en oro seguida de
+// Separador de sección dentro de un bento: encabezado de grupo seguido de
 // una línea que se desvanece hacia la derecha. Ocupa las 12 columnas.
 export default function SubHead({ children }: { children: React.ReactNode }) {
   return (

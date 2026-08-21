@@ -1,10 +1,10 @@
 /**
- * Acento personal: reemplaza el oro de la casa por el color que eligió el
+ * Acento personal: reemplaza el azul acero de la casa por el color que eligió el
  * usuario. NO toca los cuatro elementos — Agua, Viento, Tierra y Fuego siguen
  * pintando sus módulos con su color, que es la señal de en qué sección estás.
  *
  * Las variables se inyectan como estilo EN LÍNEA sobre <html>, no como una
- * regla `:root`. Es a propósito: globals.css define el oro dos veces, en
+ * regla `:root`. Es a propósito: globals.css define el acento dos veces, en
  * `:root` y en `:root.dark`, y una regla nueva `:root` perdería contra la
  * segunda por especificidad. El estilo en línea le gana a las dos sin recurrir
  * a !important ni depender del orden de las hojas.
@@ -84,10 +84,10 @@ export function accentStyle(accentColor: string | undefined | null): React.CSSPr
   if (!hex) return {};
 
   return {
-    "--gold": hex,
+    "--steel": hex,
     // La variante "vivid" se usa en modo oscuro, donde el color plano se apaga
     // contra el fondo. Aclararla un cuarto la levanta sin cambiarle el matiz.
-    "--gold-vivid": `color-mix(in srgb, ${hex} 76%, white)`,
+    "--steel-vivid": `color-mix(in srgb, ${hex} 76%, white)`,
     "--primary": hex,
     "--primary-fg": readableInk(hex),
   } as React.CSSProperties;

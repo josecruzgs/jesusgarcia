@@ -5,7 +5,7 @@ export default function Meter({
   value,
   total,
   valueLabel,
-  accent = "var(--gold)",
+  accent = "var(--steel)",
 }: {
   label: string;
   value: number;

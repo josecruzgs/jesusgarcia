@@ -74,7 +74,7 @@ export default function IdeaCard({
           title={idea.kept ? "Guardada: sobrevive a la próxima generación" : "Guardar esta idea"}
           aria-label={idea.kept ? "Quitar de guardadas" : "Guardar idea"}
           className="grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-colors"
-          style={{ color: idea.kept ? "var(--gold)" : "var(--text-muted)" }}
+          style={{ color: idea.kept ? "var(--steel)" : "var(--text-muted)" }}
         >
           {idea.kept ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
         </button>
@@ -88,7 +88,7 @@ export default function IdeaCard({
             <span className="label-mono">Borrador</span>
             <button
               onClick={copyDraft}
-              className="label-mono-sm inline-flex items-center gap-1 normal-case tracking-normal transition-colors hover:text-gold"
+              className="label-mono-sm inline-flex items-center gap-1 normal-case tracking-normal transition-colors hover:text-steel"
             >
               {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
               {copied ? "Copiado" : "Copiar"}

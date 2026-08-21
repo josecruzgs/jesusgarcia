@@ -245,7 +245,7 @@ export default function UsersPage() {
                     <td className="px-4 py-3">
                       {u.role === "admin" ? (
                         <span className="inline-flex items-center gap-1.5 text-xs text-ink-secondary">
-                          <ShieldCheck className="h-3.5 w-3.5 text-gold" /> Todos
+                          <ShieldCheck className="h-3.5 w-3.5 text-steel" /> Todos
                         </span>
                       ) : (
                         <GroupChips

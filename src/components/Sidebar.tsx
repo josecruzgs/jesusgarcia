@@ -46,8 +46,8 @@ type NavSection = {
 
 // Un solo acento para todo el menú. Antes cada elemento traía el suyo (Agua
 // azul, Viento celeste, Tierra verde, Fuego naranja); ahora los cinco grupos
-// usan el acento de la casa, que es el oro o el color que el usuario haya
-// elegido en /ajustes — `text-gold` resuelve a --gold, y accentStyle() lo
+// usan el acento de la casa, que es el azul acero o el color que el usuario haya
+// elegido en /ajustes — `text-steel` resuelve a --steel, y accentStyle() lo
 // reescribe en línea sobre <html>.
 //
 // Clases completas y literales a propósito (no interpoladas): el scanner de
@@ -57,7 +57,7 @@ type NavSection = {
 // Fluent (ver abajo). Un tinte del acento se sostenía sobre el gris de la casa,
 // pero sobre un menú pintado de un color propio queda compitiendo con el fondo
 // y el ítem seleccionado deja de leerse como seleccionado.
-const ACCENT_TEXT = "text-gold";
+const ACCENT_TEXT = "text-steel";
 
 const NAV_SECTIONS: NavSection[] = [
   {
@@ -275,7 +275,7 @@ export default function Sidebar() {
           const isOpen = !closedSections[section.key];
           const showHeader = showLabels && section.icon;
           // Con un menú de color propio, el acento se hunde en el fondo (un
-          // oro sobre un vino deja de leerse). Ahí los encabezados pasan a la
+          // azul sobre otro azul deja de leerse). Ahí los encabezados pasan a la
           // tinta legible, que sidebarStyle() ya calculó contra ese fondo.
           const headerColor = hasCustomSidebar ? "text-ink" : ACCENT_TEXT;
 

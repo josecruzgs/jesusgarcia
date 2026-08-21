@@ -203,8 +203,8 @@ export default async function Home() {
       <div className="bento">
         <SubHead>Estado de la operación</SubHead>
 
-        <StatCard label="Perfiles" value={stats.profiles} href="/profiles" icon={Users} accent="gold" />
-        <StatCard label="Grupos" value={stats.groups} href="/groups" icon={FolderKanban} accent="gold" />
+        <StatCard label="Perfiles" value={stats.profiles} href="/profiles" icon={Users} accent="steel" />
+        <StatCard label="Grupos" value={stats.groups} href="/groups" icon={FolderKanban} accent="steel" />
         <StatCard label="En cola" value={stats.pendingOrQueued} href="/tasks?status=queued" icon={Clock} accent="agua" />
         <StatCard
           label="Corriendo"
@@ -252,7 +252,7 @@ export default async function Home() {
           value={stats.last7}
           href="/tasks?status=success"
           icon={CalendarCheck}
-          accent="gold"
+          accent="steel"
           delta={
             stats.last7 > 0 || stats.last7Delta !== 0
               ? { text: `${Math.abs(stats.last7Delta)}% vs. semana previa`, positive: stats.last7Delta >= 0 }
@@ -323,7 +323,7 @@ export default async function Home() {
               accent="var(--el-viento)"
               icon={<ElementIcon name="viento" size={13} />}
               right={
-                <Link href="/scrapping" className="label-mono transition-colors hover:text-gold">
+                <Link href="/scrapping" className="label-mono transition-colors hover:text-steel">
                   Ver todo →
                 </Link>
               }
@@ -349,7 +349,7 @@ export default async function Home() {
                         style={{ background: color }}
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[12.5px] leading-snug text-ink transition-colors group-hover:text-gold">
+                        <span className="block truncate text-[12.5px] leading-snug text-ink transition-colors group-hover:text-steel">
                           {m.title}
                         </span>
                         <span className="label-mono-sm mt-0.5 block">
@@ -371,7 +371,7 @@ export default async function Home() {
               col={5}
               title="Temas que dominan"
               tag="detectados por IA"
-              accent="var(--gold)"
+              accent="var(--steel)"
               icon={<ElementIcon name="eye" size={13} />}
               bodyClassName="flex h-full flex-col justify-between gap-4"
             >
@@ -386,8 +386,8 @@ export default async function Home() {
                       key={t.name}
                       className="rounded border px-2.5 py-1 font-mono text-[11px]"
                       style={{
-                        borderColor: `color-mix(in srgb, var(--gold) ${Math.max(20, 60 - i * 6)}%, transparent)`,
-                        color: i < 3 ? "var(--gold)" : "var(--text-secondary)",
+                        borderColor: `color-mix(in srgb, var(--steel) ${Math.max(20, 60 - i * 6)}%, transparent)`,
+                        color: i < 3 ? "var(--steel)" : "var(--text-secondary)",
                       }}
                     >
                       {t.name} <span className="tabular-nums opacity-60">{t.count}</span>
@@ -471,7 +471,7 @@ export default async function Home() {
           col={4}
           title="Banco de comentarios"
           tag="sin usar"
-          accent="var(--gold)"
+          accent="var(--steel)"
           icon={<ElementIcon name="eye" size={13} />}
           bodyClassName="flex h-full flex-col gap-4"
         >
@@ -479,7 +479,7 @@ export default async function Home() {
             label="Disponibles"
             value={stats.commentAvailable}
             total={stats.commentTotal}
-            accent="var(--gold)"
+            accent="var(--steel)"
           />
           <p className="text-[12px] leading-relaxed text-ink-secondary">
             Comentarios listos para la próxima campaña. Cuando se agotan, las tareas de comentar se quedan sin
@@ -502,11 +502,11 @@ export default async function Home() {
 
         <SubHead>Antes de empezar</SubHead>
 
-        <Panel col={12} accent="var(--gold)">
+        <Panel col={12} accent="var(--steel)">
           <ol className="flex flex-col gap-3">
             {PASOS.map((p, i) => (
               <li key={p.n} className="reveal flex items-start gap-3.5" style={{ ["--d" as string]: `${i * 0.05}s` }}>
-                <span className="font-display grid h-7 w-7 shrink-0 place-items-center rounded-full border border-hairline text-[13px] font-bold text-gold">
+                <span className="font-display grid h-7 w-7 shrink-0 place-items-center rounded-full border border-hairline text-[13px] font-bold text-steel">
                   {p.n}
                 </span>
                 <span className="pt-1 text-[13px] leading-snug text-ink-secondary">
@@ -520,7 +520,7 @@ export default async function Home() {
                   ) : p.href ? (
                     <>
                       Ve a{" "}
-                      <Link className="text-gold underline-offset-4 hover:underline" href={p.href}>
+                      <Link className="text-steel underline-offset-4 hover:underline" href={p.href}>
                         {p.link}
                       </Link>{" "}
                       para {p.t.charAt(0).toLowerCase()}

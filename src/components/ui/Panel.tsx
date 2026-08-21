@@ -17,7 +17,7 @@ export default function Panel({
   tag,
   right,
   icon,
-  accent = "var(--gold)",
+  accent = "var(--steel)",
   col = 4,
   minH,
   className = "",

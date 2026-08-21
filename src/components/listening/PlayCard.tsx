@@ -192,7 +192,7 @@ export default function PlayCard({
           href={play.target.url}
           target="_blank"
           rel="noreferrer"
-          className="label-mono-sm mt-1.5 inline-flex items-center gap-1 normal-case tracking-normal transition-colors hover:text-gold"
+          className="label-mono-sm mt-1.5 inline-flex items-center gap-1 normal-case tracking-normal transition-colors hover:text-steel"
         >
           Abrir la publicación <ExternalLink className="h-3 w-3" />
         </a>

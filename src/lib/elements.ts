@@ -2,7 +2,7 @@
 // pertenece a uno y hereda su ícono y su lema.
 //
 // Lo que YA NO heredan es un color propio. Agua, Viento, Tierra y Fuego se
-// pintan todos con el acento —el oro de la casa, o el color que el usuario
+// pintan todos con el acento —el azul acero de la casa, o el color que el usuario
 // haya elegido en /ajustes—, y la sección se reconoce por el ícono, el título
 // y qué está marcado en el menú. Los tokens --el-* siguen existiendo en
 // globals.css como alias del acento: ahí está el único punto de reversión.

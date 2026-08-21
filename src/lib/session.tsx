@@ -23,7 +23,7 @@ const SessionContext = createContext<ClientSession | null>(null);
  *
  * Antes cada componente la pedía por fetch a /api/auth/me, y eso significaba
  * pintar primero con los valores por defecto y corregir después: se veía el
- * logo de la casa cambiando a la foto del usuario, y el oro cambiando a su
+ * logo de la casa cambiando a la foto del usuario, y el acero cambiando a su
  * color. Sirviéndola desde el servidor, la primera pintura ya es la correcta.
  */
 export function SessionProvider({

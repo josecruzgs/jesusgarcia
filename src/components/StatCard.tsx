@@ -3,14 +3,14 @@ import { type LucideIcon } from "lucide-react";
 import Num from "@/components/ui/Num";
 import type { PanelCol } from "@/components/ui/Panel";
 
-export type StatAccent = "primary" | "gold" | "warning" | "series-3" | "series-5" | "success" | "agua" | "viento" | "tierra" | "fuego";
+export type StatAccent = "primary" | "steel" | "warning" | "series-3" | "series-5" | "success" | "agua" | "viento" | "tierra" | "fuego";
 
 // Valores CSS crudos (no clases): alimentan el degradado de la barra de
 // acento y el tinte del ícono, y ambos necesitan el color real para poder
 // mezclarlo con color-mix().
 const ACCENT_VALUES: Record<StatAccent, string> = {
   primary: "var(--primary)",
-  gold: "var(--gold)",
+  steel: "var(--steel)",
   warning: "var(--status-warning)",
   "series-3": "var(--series-3)",
   "series-5": "var(--series-5)",
@@ -35,7 +35,7 @@ export default function StatCard({
   value,
   href,
   icon: Icon,
-  accent = "gold",
+  accent = "steel",
   delta,
   live,
   col = 3,

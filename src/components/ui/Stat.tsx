@@ -15,7 +15,7 @@ export default function Stat({
   sub,
   href,
   live,
-  accent = "var(--gold)",
+  accent = "var(--steel)",
   col = 3,
   icon,
 }: {

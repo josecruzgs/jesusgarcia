@@ -7,13 +7,13 @@ export type UserRole = (typeof USER_ROLES)[number];
 /**
  * Apariencia y hora local, por usuario.
  *
- * Todo vacío significa "lo de la casa": el oro, el fondo original del menú, el
+ * Todo vacío significa "lo de la casa": el azul acero, el fondo original del menú, el
  * logo y los textos por defecto. Así un usuario nuevo ve el panel tal como
  * estaba y solo cambia lo que toca a propósito.
  */
 const PreferencesSchema = new Schema(
   {
-    /** Hex del acento personal. Reemplaza el oro, no los cuatro elementos. */
+    /** Hex del acento personal. Reemplaza el azul acero, no los cuatro elementos. */
     accentColor: { type: String, default: "" },
     /** Hex del tinte del menú lateral. Se aplica como velo, no como relleno. */
     sidebarColor: { type: String, default: "" },

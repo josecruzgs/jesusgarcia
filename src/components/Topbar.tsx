@@ -184,7 +184,7 @@ export default function Topbar() {
               )}
               <span className="max-w-40 truncate font-mono text-[11px] text-ink-secondary">
                 {session.username}
-                {session.role === "admin" && <span className="ml-1 text-gold">·admin</span>}
+                {session.role === "admin" && <span className="ml-1 text-steel">·admin</span>}
               </span>
             </Link>
             <button

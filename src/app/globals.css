@@ -29,10 +29,15 @@
       instrumentación (mono de 9 px en versalitas) pasaron al subtítulo de
       Fluent: sans de 12 px, caja normal, tinta secundaria. Ver --stack-*.
 
-   Lo que NO cambió: el oro de la casa sigue siendo el acento, el acento que el
-   usuario elige en /ajustes sigue mandando sobre él, y el guinda de identidad
-   sigue vivo — pero ahora tiñe los grises del tema oscuro y el mica del fondo,
-   en vez de pintar un plano vino saturado.
+   El color de la casa es el AZUL ACERO. Reemplazó al oro y al guinda, que eran
+   la paleta heredada: cada superficie iba sesgada al ámbar y el conjunto se leía
+   café aunque los grises fueran casi neutros. El acero se comporta al revés
+   —tira al azul en todos los grises— y es además la temperatura en la que están
+   pensados los materiales de Fluent, así que el tinte de las capas y el del
+   sistema apuntan ahora para el mismo lado en vez de pelearse.
+
+   Lo que NO cambió: el acento que el usuario elige en /ajustes sigue mandando
+   sobre el color de la casa, y los cuatro elementos lo siguen tomando prestado.
 
    Igual que en el rediseño anterior, esto se hizo moviendo valores acá: los
    ~70 componentes siguen usando `card-surface`, `bg-surface`, `text-ink`, etc.
@@ -53,22 +58,22 @@
        --page-plane  el lienzo donde se apoyan las tarjetas.
        --surface-1   la tarjeta.
        --surface-2   relleno sutil: hover de lista, bloque anidado, celda. */
-  --rail-bg: #eeeeee;
-  --page-plane: #f9f9f9;
+  --rail-bg: #e8ebef;
+  --page-plane: #f6f8fa;
   --surface-1: #ffffff;
-  --surface-2: #f4f4f4;
+  --surface-2: #eef1f5;
 
   /* Tinta con los porcentajes de Fluent: 89% / 61% / 45% de negro. No son
      grises elegidos a ojo — son los tres únicos niveles del sistema, y por eso
      la jerarquía se sostiene igual sobre cualquiera de las tres capas. */
-  --text-primary: #1b1b1b;
-  --text-secondary: #5d5d5d;
-  --text-muted: #8b8b8b;
+  --text-primary: #1a1e23;
+  --text-secondary: #5a626b;
+  --text-muted: #88919b;
 
-  --gridline: #ebebeb;
-  --baseline: #c4c4c4;
-  --border-hairline: #e5e5e5;
-  --border-hi: rgba(0, 0, 0, 0.24);
+  --gridline: #e8ecf0;
+  --baseline: #bfc7d0;
+  --border-hairline: #e2e7ec;
+  --border-hi: rgba(16, 24, 34, 0.26);
 
   /* --- Filos ---
      --card-stroke es el contorno de una superficie; va MUY tenue (6% de negro)
@@ -79,9 +84,9 @@
      sombra propia del canto); en oscuro va ARRIBA y clara (el brillo del
      canto). Es el mismo truco que usa WinUI, y es lo que reemplaza a la sombra
      larga del vidrio. */
-  --card-stroke: rgba(0, 0, 0, 0.06);
-  --card-stroke-hi: rgba(0, 0, 0, 0.13);
-  --control-elev: inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+  --card-stroke: rgba(16, 24, 34, 0.07);
+  --card-stroke-hi: rgba(16, 24, 34, 0.14);
+  --control-elev: inset 0 -1px 0 rgba(16, 24, 34, 0.07);
 
   /* Sombra solo para lo que flota de verdad. Dos niveles, como Fluent: menú y
      diálogo. Ninguna tarjeta las usa. */
@@ -102,31 +107,37 @@
      bajo que se ve en el chasis y en el aire entre tarjetas, nunca debajo de
      un texto. En claro va casi al mínimo — sobre tinta negra, cualquier subida
      de tono del fondo cuesta contraste. */
-  --mica-tint: #8a6a28;
-  --mica-strength: 6%;
+  --mica-tint: #3f7cb8;
+  --mica-strength: 7%;
 
   /* --- Acento de marca ---
-     El oro es la identidad de la sala. En claro se baja de luminancia
-     (#8a6a28) para que pase contraste como texto (5.4:1); en oscuro vuelve al
-     #cbb074 de la referencia. */
-  --gold: #8a6a28;
-  --gold-vivid: #b3903f;
-  --primary: #8a6a28;
+     El azul acero. Cada tema usa su propia versión porque un solo valor no
+     puede leerse en los dos: en claro va hundido (#2f5f86, 6:1 como texto
+     sobre el lienzo) y en oscuro sube hasta despegarse del plano.
+
+     El de oscuro además está elegido por encima del umbral de readableInk()
+     (src/lib/theme.ts, luminancia > 0.45): esa función decide si un acento
+     lleva tinta clara u oscura encima, y un azul que caiga justo debajo del
+     corte recibe texto blanco con un contraste de 2:1. Al quedar del lado
+     claro, el --primary-fg que calcula coincide con el que se fija acá. */
+  --steel: #2f5f86;
+  --steel-vivid: #3f7cab;
+  --primary: #2f5f86;
   --primary-fg: #ffffff;
 
   /* --- Los cuatro elementos ---
-     Los cuatro apuntan al acento, que es el oro de la casa o el color que el
-     usuario haya elegido en /ajustes. La señal de en qué sección estás la dan
-     el ícono, el título y el menú, no el color.
+     Los cuatro apuntan al acento, que es el azul acero de la casa o el color
+     que el usuario haya elegido en /ajustes. La señal de en qué sección estás
+     la dan el ícono, el título y el menú, no el color.
 
      Se conservan como tokens en vez de borrarse porque son el punto único de
      reversión: hay unas treinta referencias a `--el-*` y `text-viento`
      repartidas por la app, y devolverle color propio a un elemento es cambiar
      una línea acá, no perseguirlas de nuevo una por una. */
-  --el-viento: var(--gold);
-  --el-agua: var(--gold);
-  --el-tierra: var(--gold);
-  --el-fuego: var(--gold);
+  --el-viento: var(--steel);
+  --el-agua: var(--steel);
+  --el-tierra: var(--steel);
+  --el-fuego: var(--steel);
   /* Alias histórico: el sidebar y las páginas de Tareas lo usan. */
   --agua: var(--el-agua);
 
@@ -161,15 +172,15 @@
   --series-4: #9d5d00;
   --series-5: #026e70;
   --series-6: #b1500a;
-  --series-7: #8a6a28;
+  --series-7: #2f5f86;
   --series-8: #c42b1c;
 
   /* --- Rampa secuencial (magnitud) --- */
-  --seq-100: #e7ddc4;
-  --seq-250: #d3c091;
-  --seq-400: #b3903f;
-  --seq-450: #8a6a28;
-  --seq-550: #63491a;
+  --seq-100: #dde7f1;
+  --seq-250: #aec8de;
+  --seq-400: #6a9cc4;
+  --seq-450: #2f5f86;
+  --seq-550: #1c4160;
 
   /* --- Tipografía ---
      Segoe UI Variable es la tipografía de Windows 11 y trae dos cortes con rol
@@ -193,57 +204,59 @@
   /* Las mismas tres capas, invertidas: acá cada escalón hacia arriba SUMA luz.
      El chasis vuelve a ser el plano más hondo.
 
-     El guinda de identidad entra por acá: estos no son los grises neutros de
-     Fluent (#202020 y compañía) sino esos mismos valores sesgados al vino. Es
+     El acero de identidad entra por acá: estos no son los grises neutros de
+     Fluent (#202020 y compañía) sino esos mismos valores sesgados al azul. Es
      el equivalente de tener el acento tiñendo las superficies en Windows: el
      color de la casa se nota en todo el chasis sin que ningún texto tenga que
-     apoyarse encima de él. Va contenido a propósito — un guinda saturado de
+     apoyarse encima de él. Va contenido a propósito — un azul saturado de
      fondo cansa la vista en una pantalla que se mira ocho horas y le pelea el
      color a los datos. */
-  --rail-bg: #171215;
-  --page-plane: #1f1a1c;
-  --surface-1: #2a2327;
-  --surface-2: #342c30;
+  --rail-bg: #12171e;
+  --page-plane: #1a2029;
+  --surface-1: #232c37;
+  --surface-2: #2e3844;
 
   /* Los mismos tres niveles de Fluent en oscuro: 100% / 79% / 54% de blanco,
-     con un punto de rosa —un blanco neutro sobre vino se ve verdoso por
-     contraste simultáneo. */
-  --text-primary: #fbf7f8;
-  --text-secondary: #c8bfc2;
-  --text-muted: #978d91;
+     con un punto de azul. La tinta se sesga hacia el mismo lado que el fondo a
+     propósito: un blanco neutro sobre un plano frío se ve amarillento por
+     contraste simultáneo, igual que uno cálido se veía verdoso sobre el vino
+     anterior. */
+  --text-primary: #f1f5f9;
+  --text-secondary: #bcc6d2;
+  --text-muted: #8c96a3;
 
-  --gridline: #2f272b;
-  --baseline: #4a4045;
-  --border-hairline: #382f33;
+  --gridline: #28313c;
+  --baseline: #445263;
+  --border-hairline: #303a47;
   --border-hi: rgba(255, 255, 255, 0.22);
 
   /* El contorno de la tarjeta se vuelve NEGRO en oscuro, no blanco: acá la
      tarjeta ya es más clara que su lienzo, así que lo que la recorta es una
      sombra dura de un píxel. Y el filo de elevación se muda al canto de
      arriba, que es donde pegaría la luz. */
-  --card-stroke: rgba(0, 0, 0, 0.3);
+  --card-stroke: rgba(0, 0, 0, 0.32);
   --card-stroke-hi: rgba(255, 255, 255, 0.16);
-  --control-elev: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --control-elev: inset 0 1px 0 rgba(255, 255, 255, 0.07);
 
   --shadow-flyout: 0 8px 16px rgba(0, 0, 0, 0.5);
   --shadow-dialog: 0 32px 64px rgba(0, 0, 0, 0.65);
 
   /* Sobre plano oscuro el mica puede subir: no le está comiendo contraste a
-     ninguna tinta y es lo que hace que el chasis se lea guinda y no gris. */
-  --mica-tint: #8e2049;
+     ninguna tinta y es lo que hace que el chasis se lea acero y no gris. */
+  --mica-tint: #3f7cb8;
   --mica-strength: 16%;
 
-  --gold: #cbb074;
-  --gold-vivid: #e0c68d;
-  --primary: #cbb074;
-  /* Tinta oscura sobre oro — con blanco encima, el oro no pasa contraste. */
+  --steel: #96bcdd;
+  --steel-vivid: #b3d1ec;
+  --primary: #96bcdd;
+  /* Tinta oscura sobre el acero claro — con blanco encima no pasa contraste. */
   --primary-fg: #0a0d14;
 
   /* Igual que en claro: los cuatro elementos son el acento (ver :root). */
-  --el-viento: var(--gold);
-  --el-agua: var(--gold);
-  --el-tierra: var(--gold);
-  --el-fuego: var(--gold);
+  --el-viento: var(--steel);
+  --el-agua: var(--steel);
+  --el-tierra: var(--steel);
+  --el-fuego: var(--steel);
   --agua: var(--el-agua);
 
   /* Semáforo de Fluent en oscuro: los mismos estados, subidos de luminancia
@@ -272,7 +285,7 @@
   --series-4: #e0b132;
   --series-5: #4cd1cc;
   --series-6: #e08b3e;
-  --series-7: #cbb074;
+  --series-7: #96bcdd;
   --series-8: #ff99a4;
 
   --seq-100: #1b2b3d;
@@ -306,8 +319,8 @@
 
   --color-primary: var(--primary);
   --color-primary-fg: var(--primary-fg);
-  --color-gold: var(--gold);
-  --color-gold-vivid: var(--gold-vivid);
+  --color-steel: var(--steel);
+  --color-steel-vivid: var(--steel-vivid);
 
   --color-agua: var(--el-agua);
   --color-viento: var(--el-viento);
@@ -403,9 +416,11 @@ body::before {
   }
 }
 
+/* El par acento + su tinta legible, no una tinta fija: en tema claro el acento
+   es oscuro y un texto casi negro encima quedaba ilegible. */
 ::selection {
-  background: var(--gold);
-  color: #0a0d14;
+  background: var(--primary);
+  color: var(--primary-fg);
 }
 /* Barra de scroll al modo de Windows 11: canal transparente, pulgar delgado y
    redondeado, con espacio de respiro a los lados (el borde del mismo color que
@@ -649,7 +664,7 @@ body::before {
   bottom: 14px;
   width: 3px;
   border-radius: 0 3px 3px 0;
-  background: var(--kpi-c, var(--gold));
+  background: var(--kpi-c, var(--steel));
 }
 
 /* El ícono va como insignia: chico, nítido y en un cuadro tintado arriba a la
@@ -663,9 +678,9 @@ body::before {
   height: 30px;
   padding: 6px;
   border-radius: var(--r-control);
-  color: var(--kpi-c, var(--gold));
-  background: color-mix(in srgb, var(--kpi-c, var(--gold)) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--kpi-c, var(--gold)) 28%, transparent);
+  color: var(--kpi-c, var(--steel));
+  background: color-mix(in srgb, var(--kpi-c, var(--steel)) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--kpi-c, var(--steel)) 28%, transparent);
   pointer-events: none;
 }
 
@@ -893,14 +908,16 @@ body::before {
   box-shadow: var(--control-elev);
 }
 
-/* Sello de clasificación de la topbar ("USO INTERNO"). */
+/* Sello de clasificación de la topbar ("USO INTERNO"). Va NEUTRO, no ámbar:
+   "uso interno" es una etiqueta, no una advertencia, y el ámbar del semáforo
+   queda reservado para estados. Era además la última mancha cálida del chasis. */
 .classchip {
   font-family: var(--stack-sans);
   font-size: 12px;
   line-height: 16px;
-  color: var(--amber);
-  border: 1px solid color-mix(in srgb, var(--amber) 40%, transparent);
-  background: color-mix(in srgb, var(--amber) 10%, transparent);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-2);
   padding: 2px 8px;
   border-radius: var(--r-control);
   white-space: nowrap;

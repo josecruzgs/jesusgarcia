@@ -19,7 +19,7 @@ import RouteLoading from "./RouteLoading";
 
 type Config = { icon: LucideIcon; accent: string };
 
-const DEFAULT_CONFIG: Config = { icon: LayoutDashboard, accent: "var(--gold)" };
+const DEFAULT_CONFIG: Config = { icon: LayoutDashboard, accent: "var(--steel)" };
 
 // Mismos íconos/colores que cada loading.tsx de ruta (ver src/app/*/loading.tsx).
 // Este overlay es el que realmente se percibe: la navegación entre rutas ya
@@ -28,14 +28,14 @@ const DEFAULT_CONFIG: Config = { icon: LayoutDashboard, accent: "var(--gold)" };
 // dure lo suficiente para notarse en cada cambio de página.
 const ROUTE_CONFIG: { prefix: string; config: Config }[] = [
   { prefix: "/campanas", config: { icon: ListChecks, accent: "var(--el-agua)" } },
-  { prefix: "/tasks/warmup", config: { icon: Activity, accent: "var(--gold)" } },
+  { prefix: "/tasks/warmup", config: { icon: Activity, accent: "var(--steel)" } },
   { prefix: "/tasks", config: { icon: Droplets, accent: "var(--el-agua)" } },
   { prefix: "/scrapping", config: { icon: Wind, accent: "var(--el-viento)" } },
   { prefix: "/actividades", config: { icon: Mountain, accent: "var(--el-tierra)" } },
   { prefix: "/dia-d", config: { icon: Flame, accent: "var(--el-fuego)" } },
-  { prefix: "/profiles/auto-profile", config: { icon: UserCog, accent: "var(--gold)" } },
-  { prefix: "/profiles", config: { icon: Users, accent: "var(--gold)" } },
-  { prefix: "/groups", config: { icon: FolderKanban, accent: "var(--gold)" } },
+  { prefix: "/profiles/auto-profile", config: { icon: UserCog, accent: "var(--steel)" } },
+  { prefix: "/profiles", config: { icon: Users, accent: "var(--steel)" } },
+  { prefix: "/groups", config: { icon: FolderKanban, accent: "var(--steel)" } },
 ];
 
 // Match de prefijo más largo (no el primero que matchee): así una ruta más

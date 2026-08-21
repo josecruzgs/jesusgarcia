@@ -56,7 +56,7 @@ function LoginForm() {
           <span
             key={i}
             className="splash-ring"
-            style={{ borderColor: "color-mix(in srgb, var(--gold) 30%, transparent)", animationDelay: `${i * 0.8}s` }}
+            style={{ borderColor: "color-mix(in srgb, var(--steel) 30%, transparent)", animationDelay: `${i * 0.8}s` }}
           />
         ))}
       </div>
@@ -91,7 +91,7 @@ function LoginForm() {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           placeholder="Usuario"
-          className="rounded border border-hairline bg-page px-3 py-2.5 text-sm outline-none transition-colors focus:border-gold"
+          className="rounded border border-hairline bg-page px-3 py-2.5 text-sm outline-none transition-colors focus:border-steel"
         />
 
         <input
@@ -101,7 +101,7 @@ function LoginForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Contraseña"
-          className="rounded border border-hairline bg-page px-3 py-2.5 text-sm outline-none transition-colors focus:border-gold"
+          className="rounded border border-hairline bg-page px-3 py-2.5 text-sm outline-none transition-colors focus:border-steel"
         />
 
         <button

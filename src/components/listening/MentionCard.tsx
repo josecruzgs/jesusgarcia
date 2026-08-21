@@ -89,10 +89,10 @@ export default function MentionCard({ mention }: { mention: MentionRow }) {
         rel="noopener noreferrer"
         className="group mt-2.5 flex items-start gap-1.5"
       >
-        <h3 className="text-[14px] font-medium leading-snug text-ink transition-colors group-hover:text-gold">
+        <h3 className="text-[14px] font-medium leading-snug text-ink transition-colors group-hover:text-steel">
           {mention.title || mention.text?.slice(0, 120) || mention.url}
         </h3>
-        <ExternalLink className="mt-1 h-3.5 w-3.5 shrink-0 text-ink-muted transition-colors group-hover:text-gold" />
+        <ExternalLink className="mt-1 h-3.5 w-3.5 shrink-0 text-ink-muted transition-colors group-hover:text-steel" />
       </a>
 
       {mention.aiSummary && (

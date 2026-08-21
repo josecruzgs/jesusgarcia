@@ -18,7 +18,7 @@ export default function Splash({
   tag = "Sala de Inteligencia",
   lead = "Equipo Jesús García",
   icon = "eye",
-  color = "var(--gold)",
+  color = "var(--steel)",
   storageKey = "splash-seen",
 }: {
   name?: string;
