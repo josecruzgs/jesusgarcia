@@ -152,11 +152,7 @@ function labelSelectors(labels: string[]): string {
 }
 
 const FACEBOOK_LIKE_SELECTOR = labelSelectors(FACEBOOK_LIKE_LABELS);
-// Solo por etiqueta, sin respaldo por `aria-pressed="true"`: ese atributo lo
-// llevan también otros botones de la página, y confundir uno con la reacción
-// haría reportar como hecho un like que nunca se dio. Ante un idioma que no
-// esté en la lista, es preferible fallar de forma visible.
-const FACEBOOK_ALREADY_LIKED_SELECTOR = labelSelectors(FACEBOOK_UNLIKE_LABELS);
+
 
 /**
  * Atributo temporal con el que el runner marca, dentro de la página, el botón
@@ -391,12 +387,32 @@ function isFacebookLikeSelector(selector: string) {
   return FACEBOOK_LIKE_LABELS.some((label) => selector.includes(`aria-label="${label}"`));
 }
 
-function selectorForStep(selector: string, ctx: StepContext) {
+/**
+ * El selector con el que se va a buscar de verdad, ya preparada la página.
+ *
+ * Se resuelve DESPUÉS de `prepareSelectorTarget` y no antes, porque lo que
+ * decide es si el sondeo llegó a marcar el botón de la publicación.
+ *
+ * Con marca se usa solo esa: unir la marca con el selector ancho no servía de
+ * nada, porque quien clickea se queda con el primero del documento y el rótulo
+ * "Me gusta" lo llevan también los botones de cada comentario —que en el
+ * dialog suelen aparecer antes—. Se marcaba bien el botón correcto y se
+ * clickeaba otro.
+ *
+ * Sin marca se cae al selector ancho, que es como funcionaba: si el sondeo no
+ * encontró la barra de acciones, es mejor intentarlo que rendirse.
+ */
+async function selectorForStep(page: Page, selector: string, ctx: StepContext) {
   if (ctx.taskType === "comment" && isFacebookCommentBoxSelector(selector)) {
     return `${selector}, ${FACEBOOK_COMMENT_BOX_SELECTOR}`;
   }
   if (ctx.taskType === "like" && isFacebookLikeSelector(selector)) {
-    return `${selector}, ${FACEBOOK_LIKE_SELECTOR}, [${FACEBOOK_POST_LIKE_MARK}]`;
+    const marcado = await page
+      .locator(`[${FACEBOOK_POST_LIKE_MARK}]`)
+      .count()
+      .catch(() => 0);
+    if (marcado > 0) return `[${FACEBOOK_POST_LIKE_MARK}]`;
+    return `${selector}, ${FACEBOOK_LIKE_SELECTOR}`;
   }
   return selector;
 }
@@ -673,10 +689,6 @@ async function explicarFalloDeLike(page: Page, message: string) {
   );
 }
 
-function yaReaccionadaSelector() {
-  return `${FACEBOOK_ALREADY_LIKED_SELECTOR}, [${FACEBOOK_POST_LIKED_MARK}]`;
-}
-
 type PostLikeProbe = {
   status: "ready" | "already_liked" | "not_found";
   detail: string;
@@ -755,14 +767,27 @@ async function markFacebookPostLike(page: Page): Promise<PostLikeProbe> {
         return false;
       };
 
-      const yaPuesto = botones.filter((el) => coincide(nombreDe(el), unlikePatterns)).find(enBarraDeAcciones) ?? null;
+      // Y esto es lo que los separa de verdad: un comentario —y una respuesta a
+      // un comentario— es un `role="article"` metido dentro del `role="article"`
+      // del post. El vecindario por sí solo no alcanzaba: subiendo cuatro
+      // niveles, el `querySelectorAll` de un comentario termina alcanzando la
+      // barra de acciones del post y lo daba por bueno, así que se acababa
+      // reaccionando a un comentario en vez de a la publicación.
+      const esDeComentario = (el: HTMLElement) => {
+        const article = el.closest('[role="article"]');
+        return Boolean(article && article.parentElement?.closest('[role="article"]'));
+      };
+
+      const delPost = (el: HTMLElement) => !esDeComentario(el) && enBarraDeAcciones(el);
+
+      const yaPuesto = botones.filter((el) => coincide(nombreDe(el), unlikePatterns)).find(delPost) ?? null;
       if (yaPuesto) {
         yaPuesto.setAttribute(likedMark, "1");
         yaPuesto.scrollIntoView({ block: "center" });
         return { status: "already_liked", detail: nombreDe(yaPuesto).slice(0, 60) };
       }
 
-      const boton = botones.filter((el) => coincide(nombreDe(el), likePatterns)).find(enBarraDeAcciones) ?? null;
+      const boton = botones.filter((el) => coincide(nombreDe(el), likePatterns)).find(delPost) ?? null;
       if (!boton) {
         return { status: "not_found", detail: `${botones.length} boton(es) mirados` };
       }
@@ -836,19 +861,21 @@ const BUSCAR_LIKE_INTENTOS = 4;
 async function prepareFacebookLike(page: Page, ctx: StepContext) {
   await ensureOnTargetUrl(page, ctx);
   await freezeReelPlayback(page);
-  if (await hasVisibleLocator(page, FACEBOOK_LIKE_SELECTOR)) return;
-
-  // Ya reaccionada: el botón que existe es el de quitarla, y buscar el de
-  // ponerla es esperar por algo que no va a aparecer. No se toca nada —
-  // desmarcar sería deshacer el trabajo—; el paso siguiente lo resuelve.
-  if (await hasVisibleLocator(page, yaReaccionadaSelector())) return;
-
   await dismissFacebookOverlays(page, ctx);
-  if (await hasVisibleLocator(page, FACEBOOK_LIKE_SELECTOR)) return;
 
-  // Hasta acá se buscó por `aria-label`. Lo que sigue es el sondeo por fila de
-  // acciones, que además baja dentro del post: la barra suele estar debajo de
-  // la imagen, y en el dialog eso es scroll interno.
+  // Acá había tres atajos: si ya se veía algo que casara con el selector de
+  // "Me gusta", se daba por resuelto sin sondear. El problema es que ese
+  // selector es por `aria-label`, y ese rótulo lo llevan igual los botones de
+  // cada comentario: el atajo se cumplía con el botón de un comentario, se
+  // saltaba el sondeo, y el click terminaba reaccionando ahí.
+  //
+  // El sondeo es el único que sabe distinguirlos —mira el ancestro, no el
+  // rótulo—, así que ahora corre siempre. Cuesta un `evaluate`, nada al lado de
+  // lo que ya se pagó cargando la página.
+  //
+  // Lo mismo valía para el atajo de "ya reaccionada": el botón de quitar la
+  // reacción de un comentario ajeno daba la tarea por hecha sin haber tocado la
+  // publicación. El sondeo también resuelve ese caso, y con el post a la vista.
   for (let intento = 1; intento <= BUSCAR_LIKE_INTENTOS; intento += 1) {
     const probe = await markFacebookPostLike(page);
 
@@ -1540,8 +1567,8 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
       if (!step.selector) throw new Error("Step 'click' requiere 'selector'");
       {
         const timeoutMs = step.ms ?? DEFAULT_CLICK_TIMEOUT_MS;
-        const selector = selectorForStep(step.selector, ctx);
         await prepareSelectorTarget(page, step.selector, ctx);
+        const selector = await selectorForStep(page, step.selector, ctx);
         try {
           const target = await firstClickableLocator(page, selector, timeoutMs);
           await target.locator.click({ position: target.position, timeout: timeoutMs });
@@ -1552,10 +1579,11 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
           // dar like, sino el de quitarla. Eso es la tarea cumplida, no un
           // fallo: reportarlo como error obliga a revisar a mano algo que ya
           // estaba hecho.
-          if (
-            ctx.taskType === "like" &&
-            (await hasVisibleLocator(page, yaReaccionadaSelector()))
-          ) {
+          //
+          // Se pregunta por el sondeo y no por el selector de "quitar me gusta":
+          // ese rótulo lo tiene también cada comentario ya reaccionado por
+          // otros, y con él un like que nunca se dio se reportaba como hecho.
+          if (ctx.taskType === "like" && (await markFacebookPostLike(page)).status === "already_liked") {
             await log(ctx.taskId, "info", "La publicación ya tenía la reacción puesta; nada que hacer.");
             return;
           }
@@ -1765,8 +1793,8 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
       if (!step.selector) throw new Error("Step 'hover' requiere 'selector'");
       {
         const timeoutMs = step.ms ?? DEFAULT_ACTION_TIMEOUT_MS;
-        const selector = selectorForStep(step.selector, ctx);
         await prepareSelectorTarget(page, step.selector, ctx);
+        const selector = await selectorForStep(page, step.selector, ctx);
         const target = await firstClickableLocator(page, selector, timeoutMs);
         await target.locator.hover({ position: target.position, timeout: timeoutMs });
       }
@@ -1774,8 +1802,8 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
     case "fill":
       if (!step.selector) throw new Error("Step 'fill' requiere 'selector'");
       {
-        const selector = selectorForStep(step.selector, ctx);
         await prepareSelectorTarget(page, step.selector, ctx);
+        const selector = await selectorForStep(page, step.selector, ctx);
         const target = await firstVisibleLocator(page, selector, step.ms ?? DEFAULT_ACTION_TIMEOUT_MS);
         await target.fill(step.value ?? "", { timeout: step.ms ?? DEFAULT_ACTION_TIMEOUT_MS });
       }
@@ -1783,8 +1811,8 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
     case "type":
       if (!step.selector) throw new Error("Step 'type' requiere 'selector'");
       {
-        const selector = selectorForStep(step.selector, ctx);
         await prepareSelectorTarget(page, step.selector, ctx);
+        const selector = await selectorForStep(page, step.selector, ctx);
         const target = await firstVisibleLocator(page, selector, step.ms ?? DEFAULT_ACTION_TIMEOUT_MS);
 
         // Solo la caja de comentario pasa por la escritura verificada: es la
@@ -1806,8 +1834,8 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
       // Enter lo publica ahí.
       if (esTareaDeComentario(ctx.taskType)) await assertOnTargetUrl(page, ctx);
       if (step.selector) {
-        const selector = selectorForStep(step.selector, ctx);
         await prepareSelectorTarget(page, step.selector, ctx);
+        const selector = await selectorForStep(page, step.selector, ctx);
         const target = await firstVisibleLocator(page, selector, step.ms ?? DEFAULT_ACTION_TIMEOUT_MS);
         await target.press(step.key, { timeout: step.ms ?? DEFAULT_ACTION_TIMEOUT_MS });
       } else {
@@ -1817,8 +1845,8 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
     case "waitForSelector":
       if (!step.selector) throw new Error("Step 'waitForSelector' requiere 'selector'");
       {
-        const selector = selectorForStep(step.selector, ctx);
         await prepareSelectorTarget(page, step.selector, ctx);
+        const selector = await selectorForStep(page, step.selector, ctx);
         try {
           await firstVisibleLocator(page, selector, step.ms ?? DEFAULT_ACTION_TIMEOUT_MS);
         } catch (err) {
@@ -1828,7 +1856,7 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
           // ponerla, así que este paso no puede pasar nunca: lo que hay es el
           // de quitarla. Es la tarea cumplida, no un fallo — se deja seguir y
           // el "click" que viene después lo reconoce igual y sale por éxito.
-          if (await hasVisibleLocator(page, yaReaccionadaSelector())) {
+          if ((await markFacebookPostLike(page)).status === "already_liked") {
             await log(ctx.taskId, "info", "La publicación ya tenía la reacción puesta; nada que esperar.");
             return;
           }
