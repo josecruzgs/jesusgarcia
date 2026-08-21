@@ -64,7 +64,7 @@ const REACTION_LABEL: Record<string, string> = {
 };
 
 const inputClass =
-  "w-full rounded-[9px] border border-hairline bg-page px-3 py-2 text-sm outline-none transition-colors focus:border-primary";
+  "w-full rounded border border-hairline bg-page px-3 py-2 text-sm outline-none transition-colors focus:border-primary";
 
 export default function PlayCard({
   play,
@@ -126,7 +126,7 @@ export default function PlayCard({
               contraste garantizado. Comentar y reaccionar se distinguen por el
               filo de la tarjeta y por la etiqueta de abajo, que sí llevan el
               color de la jugada. */}
-          <span className="accent-fill mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-[8px] border">
+          <span className="accent-fill mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg border">
             <TopicIcon className="h-3.5 w-3.5" />
           </span>
           <div className="min-w-0">
@@ -161,7 +161,7 @@ export default function PlayCard({
       {/* La publicación sobre la que se actúa. Va con su score porque es el
           dato que justifica la jugada: sin él, "comentar acá" es una orden sin
           motivo visible. */}
-      <div className="rounded-[9px] border border-hairline bg-surface-2 px-3 py-2.5">
+      <div className="rounded border border-hairline bg-surface-2 px-3 py-2.5">
         <p className="label-mono-sm flex flex-wrap items-center gap-x-2 normal-case tracking-normal">
           <span className="text-ink-secondary">
             {PLATFORM_LABEL[play.target.platform ?? ""] ?? play.target.platform ?? "—"}
@@ -207,7 +207,7 @@ export default function PlayCard({
             max={30}
             value={count}
             onChange={(e) => setCount(Math.max(1, Math.min(30, Number(e.target.value) || 1)))}
-            className="ml-2 w-16 rounded-[7px] border border-hairline bg-page px-2 py-1 font-mono text-[11px] outline-none focus:border-primary"
+            className="ml-2 w-16 rounded border border-hairline bg-page px-2 py-1 font-mono text-[11px] outline-none focus:border-primary"
           />
         </label>
       )}
@@ -259,7 +259,7 @@ export default function PlayCard({
               {play.comments.map((text, i) => (
                 <li
                   key={i}
-                  className="rounded-[8px] border border-hairline px-3 py-2 text-[12.5px] leading-snug text-ink-secondary"
+                  className="rounded-lg border border-hairline px-3 py-2 text-[12.5px] leading-snug text-ink-secondary"
                 >
                   {text}
                 </li>

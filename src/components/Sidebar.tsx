@@ -53,8 +53,8 @@ type NavSection = {
 // Clases completas y literales a propósito (no interpoladas): el scanner de
 // Tailwind necesita verlas escritas tal cual en el código para generarlas.
 //
-// El ítem activo NO usa esto: va relleno sólido con `bg-primary text-primary-fg`
-// (ver abajo). Un tinte al 10% del acento se sostenía sobre el gris de la casa,
+// El ítem activo NO usa esto: lleva relleno sutil más la barra indicadora de
+// Fluent (ver abajo). Un tinte del acento se sostenía sobre el gris de la casa,
 // pero sobre un menú pintado de un color propio queda compitiendo con el fondo
 // y el ítem seleccionado deja de leerse como seleccionado.
 const ACCENT_TEXT = "text-gold";
@@ -222,10 +222,12 @@ export default function Sidebar() {
       // los tokens de tinta para que el texto siga legible (ver sidebarStyle).
       // Sin color elegido devuelve {} y mandan las clases de siempre.
       style={sidebarStyle(prefs?.sidebarColor)}
-      // sticky top-3 + my-3 ml-3 y alto de viewport MENOS esos márgenes: es lo
-      // que lo deja flotando en vez de pegado al canto. overflow-hidden es
-      // necesario para que el radio recorte el contenido del menú.
-      className={`glass-rail sticky top-3 my-3 ml-3 flex h-[calc(100vh-1.5rem)] shrink-0 flex-col overflow-hidden transition-[width] duration-200 ${
+      // Va a ras: alto completo, pegado al canto izquierdo y separado del
+      // contenido por la línea de 1 px que pone .nav-rail. Antes flotaba con
+      // márgenes y radio en las cuatro caras — un gesto de vidrio; el panel de
+      // navegación de Windows es parte del borde de la ventana, no una lámina
+      // apoyada encima.
+      className={`nav-rail flex h-screen shrink-0 flex-col overflow-hidden transition-[width] duration-200 ${
         collapsed ? "w-19" : "w-64"
       } ${mounted ? "" : "invisible"}`}
     >
@@ -286,12 +288,10 @@ export default function Sidebar() {
                   className="animate-fade-in-up flex items-center gap-2 px-3 pb-1 text-left"
                 >
                   <SectionIcon className={`h-3.5 w-3.5 shrink-0 ${headerColor}`} />
-                  {/* La etiqueta de sección va en mono con tracking ancho —
-                      el mismo registro tipográfico que los separadores de
-                      sección del dashboard. */}
-                  <span className={`flex-1 font-mono text-[9.5px] uppercase tracking-[0.2em] ${headerColor}`}>
-                    {section.label}
-                  </span>
+                  {/* Encabezado de grupo del menú de Windows: cuerpo de 12 px,
+                      caja normal. Era una versalita mono con tracking ancho —
+                      el registro de instrumento que se fue con el vidrio. */}
+                  <span className={`flex-1 text-[12px] font-semibold ${headerColor}`}>{section.label}</span>
                   {section.collapsible && (
                     <ChevronDown
                       className={`h-3.5 w-3.5 shrink-0 text-ink-muted transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`}
@@ -300,7 +300,7 @@ export default function Sidebar() {
                 </button>
               ) : (
                 showLabels && (
-                  <p className="animate-fade-in-up px-3 pb-1 font-mono text-[9.5px] uppercase tracking-[0.2em] text-ink-muted">
+                  <p className="animate-fade-in-up px-3 pb-1 text-[12px] font-semibold text-ink-muted">
                     {section.label}
                   </p>
                 )
@@ -320,21 +320,34 @@ export default function Sidebar() {
                         key={item.href}
                         href={item.href}
                         title={collapsed ? item.label : undefined}
-                        className={`group relative flex items-center gap-3 rounded-[9px] border py-2 text-[13px] font-medium transition-all duration-150 ${
+                        className={`group relative flex items-center gap-3 rounded border py-2 text-[14px] transition-colors duration-100 ${
                           showLabels ? "pl-7 pr-3" : "px-3"
                         } ${
                           active
-                            ? // `--primary-fg` no es blanco fijo: lo calcula
-                              // readableInk() contra el acento elegido, así un
-                              // acento claro recibe tinta oscura en vez de
-                              // quedar blanco sobre blanco.
-                              "border-transparent bg-primary text-primary-fg"
-                            : "border-transparent text-ink-secondary hover:border-hairline hover:bg-surface-2 hover:text-ink"
+                            ? // La selección de Fluent no se pinta con el
+                              // acento: es un relleno sutil más la barra
+                              // indicadora de abajo. Así el ítem activo se lee
+                              // igual con cualquier acento —incluido uno que el
+                              // usuario haya puesto casi del color del menú— y
+                              // no hace falta calcular tinta legible encima.
+                              "border-transparent bg-surface-2 font-semibold text-ink"
+                            : "border-transparent font-normal text-ink-secondary hover:bg-surface-2 hover:text-ink"
                         }`}
                       >
-                        {/* El ícono hereda la tinta del pill relleno. */}
+                        {/* La barra indicadora: 3 px con las puntas redondeadas,
+                            pegada al canto izquierdo. Es la pieza que Windows
+                            pone al lado del ítem seleccionado, y acá es lo único
+                            que lleva el acento a plena saturación. */}
+                        {active && (
+                          <span
+                            aria-hidden
+                            className={`absolute left-1 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-full ${
+                              hasCustomSidebar ? "bg-ink" : "bg-primary"
+                            }`}
+                          />
+                        )}
                         <Icon
-                          className={`h-4 w-4 shrink-0 ${active ? "" : "text-ink-muted group-hover:text-ink"}`}
+                          className={`h-4 w-4 shrink-0 ${active ? "text-ink" : "text-ink-muted group-hover:text-ink"}`}
                         />
                         {showLabels && <span className="min-w-0 flex-1 truncate">{item.label}</span>}
                       </Link>

@@ -106,7 +106,7 @@ export default function MentionCard({ mention }: { mention: MentionRow }) {
           {mention.topics?.map((topic) => (
             <span
               key={topic}
-              className="rounded-[5px] border border-hairline px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.08em] text-ink-secondary"
+              className="rounded border border-hairline px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.08em] text-ink-secondary"
             >
               {topic}
             </span>

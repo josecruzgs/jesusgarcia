@@ -22,7 +22,7 @@ export default function RouteLoading({
     <div className="flex min-h-[60vh] items-center justify-center">
       <div className="animate-fade-in-up flex flex-col items-center gap-4">
         <span
-          className="relative grid h-16 w-16 place-items-center rounded-2xl border"
+          className="relative grid h-16 w-16 place-items-center rounded-lg border"
           style={{
             color: accent,
             borderColor: `color-mix(in srgb, ${accent} 45%, transparent)`,
@@ -31,7 +31,7 @@ export default function RouteLoading({
         >
           <Icon className="h-7 w-7" />
           <span
-            className="absolute inset-0 animate-spin rounded-2xl border-2 border-transparent"
+            className="absolute inset-0 animate-spin rounded-lg border-2 border-transparent"
             style={{ borderTopColor: accent }}
           />
         </span>

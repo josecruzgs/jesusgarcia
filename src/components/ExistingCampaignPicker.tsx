@@ -37,7 +37,7 @@ export default function ExistingCampaignPicker({
         <button
           type="button"
           onClick={() => onModeChange("new")}
-          className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
+          className={`rounded px-3 py-1.5 font-medium transition-colors ${
             mode === "new" ? "bg-primary text-primary-fg" : "text-ink-secondary hover:text-ink"
           }`}
         >
@@ -46,7 +46,7 @@ export default function ExistingCampaignPicker({
         <button
           type="button"
           onClick={() => onModeChange("existing")}
-          className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
+          className={`rounded px-3 py-1.5 font-medium transition-colors ${
             mode === "existing" ? "bg-primary text-primary-fg" : "text-ink-secondary hover:text-ink"
           }`}
         >

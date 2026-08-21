@@ -24,7 +24,7 @@ export default function PageHeader({
   return (
     <header className="mb-5 flex flex-wrap items-center gap-3 border-b border-hairline pb-4">
       {icon && (
-        <span className="accent-fill grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border">
+        <span className="accent-fill grid h-9 w-9 shrink-0 place-items-center rounded border">
           {icon}
         </span>
       )}

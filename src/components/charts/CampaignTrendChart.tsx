@@ -59,7 +59,7 @@ export default function CampaignTrendChart({ data }: { data: TrendPoint[] }) {
       </div>
 
       {showTable ? (
-        <div className="max-h-72 overflow-y-auto rounded-[10px] border border-hairline">
+        <div className="max-h-72 overflow-y-auto rounded border border-hairline">
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-surface-2 text-left">
               <tr>

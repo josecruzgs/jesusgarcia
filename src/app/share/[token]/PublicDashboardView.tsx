@@ -278,7 +278,7 @@ export default function PublicDashboardView({
                   onClick={() => openCampaign(campaign._id)}
                   className="flex flex-col gap-3 p-4 text-left transition-colors hover:bg-page/60 sm:flex-row sm:items-center sm:gap-4"
                 >
-                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${iconBg} text-white`}>
+                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${iconBg} text-white`}>
                     <Icon className="h-5 w-5" />
                   </span>
                   <div className="min-w-0 flex-1">
@@ -324,7 +324,7 @@ export default function PublicDashboardView({
                         const Icon = TYPE_ICONS[selectedCampaign.type] ?? UserCog;
                         const iconBg = TYPE_ICON_BG[selectedCampaign.type] ?? "bg-primary";
                         return (
-                          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${iconBg} text-white`}>
+                          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${iconBg} text-white`}>
                             <Icon className="h-5 w-5" />
                           </span>
                         );
@@ -356,21 +356,21 @@ export default function PublicDashboardView({
 
               <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
                 {detailLoading ? (
-                  <div className="h-48 animate-pulse-soft rounded-xl bg-page" />
+                  <div className="h-48 animate-pulse-soft rounded-lg bg-page" />
                 ) : detailError ? (
-                  <p className="rounded-xl bg-critical/10 p-3 text-sm text-critical">{detailError}</p>
+                  <p className="rounded-lg bg-critical/10 p-3 text-sm text-critical">{detailError}</p>
                 ) : detail ? (
                   <div className="flex flex-col gap-4">
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                       {Object.entries(detail.campaign.counts).map(([key, value]) => (
-                        <div key={key} className="rounded-xl border border-hairline bg-page p-3">
+                        <div key={key} className="rounded-lg border border-hairline bg-page p-3">
                           <p className="text-xs uppercase tracking-wide text-ink-muted">{key}</p>
                           <p className="mt-1 text-lg font-semibold text-ink">{value}</p>
                         </div>
                       ))}
                     </div>
 
-                    <div className="rounded-xl border border-hairline">
+                    <div className="rounded-lg border border-hairline">
                       <div className="flex flex-col divide-y divide-hairline sm:hidden">
                         {detail.tasks.map((task) => (
                           <div key={task._id} className="flex flex-col gap-2 p-4">

@@ -251,7 +251,7 @@ export default function CommentCampaignPage() {
           <ArrowLeft className="h-3.5 w-3.5" /> Tareas
         </Link>
         <div className="mt-2 flex items-center gap-2.5">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border border-series-5/55 bg-series-5/12 text-series-5">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded border border-series-5/55 bg-series-5/12 text-series-5">
             <MessageSquare className="h-4.5 w-4.5" />
           </span>
           <h1 className="text-2xl font-semibold text-ink">Campaña de comentarios</h1>
@@ -261,7 +261,7 @@ export default function CommentCampaignPage() {
         </p>
       </div>
 
-      {error && <p className="rounded-xl bg-critical/10 p-3 text-sm text-critical">{error}</p>}
+      {error && <p className="rounded-lg bg-critical/10 p-3 text-sm text-critical">{error}</p>}
 
       {result && (
         <Card className="flex animate-fade-in-up flex-col gap-3 border-success/20 bg-success/5 p-4 text-sm">
@@ -340,7 +340,7 @@ export default function CommentCampaignPage() {
                 type="button"
                 disabled={importing}
                 onClick={() => importSheetUrl(DEFAULT_SHEET_CSV_URL)}
-                className="glow-btn inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-fg shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md disabled:pointer-events-none disabled:opacity-50"
+                className="glow-btn inline-flex items-center gap-1.5 rounded bg-primary px-3 py-2 text-sm font-medium text-primary-fg transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50"
               >
                 <Download className="h-4 w-4" />
                 Importar sheet por defecto
@@ -506,7 +506,7 @@ export default function CommentCampaignPage() {
             (submitMethod === "button" && !submitSelector) ||
             (campaignMode === "existing" && !existingCampaignId)
           }
-          className="glow-btn w-fit rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-fg shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md disabled:pointer-events-none disabled:opacity-50"
+          className="glow-btn w-fit rounded bg-primary px-4 py-2 text-sm font-medium text-primary-fg transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50"
         >
           {creating
             ? "Creando..."

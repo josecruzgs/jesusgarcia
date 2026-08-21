@@ -56,7 +56,7 @@ export default function IdeaCard({
   return (
     <article className="card-surface flex flex-col gap-2.5 px-4 py-3.5">
       <header className="flex items-start gap-2.5">
-        <span className="accent-fill mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-[8px] border">
+        <span className="accent-fill mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg border">
           <TopicIcon className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0 flex-1">
@@ -83,7 +83,7 @@ export default function IdeaCard({
       <p className="text-[12.5px] leading-relaxed text-ink-secondary">{idea.detail}</p>
 
       {idea.draft && (
-        <div className="rounded-[9px] border border-hairline bg-surface-2 px-3 py-2.5">
+        <div className="rounded border border-hairline bg-surface-2 px-3 py-2.5">
           <div className="flex items-center justify-between gap-2">
             <span className="label-mono">Borrador</span>
             <button

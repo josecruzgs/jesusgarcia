@@ -77,7 +77,7 @@ const TYPES = ["login", "post", "warmup", "scrape", "like", "likecomment", "comm
 
 export default function TasksPage() {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse-soft rounded-2xl bg-surface" />}>
+    <Suspense fallback={<div className="h-64 animate-pulse-soft rounded-lg bg-surface" />}>
       <TasksContent />
     </Suspense>
   );
@@ -219,49 +219,49 @@ function TasksContent() {
         <div className="flex flex-wrap gap-2">
           <Link
             href="/campanas"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
+            className="inline-flex items-center gap-1.5 rounded border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary transition-colors duration-100 hover:text-ink"
           >
             <FolderKanban className="h-4 w-4" /> Ver campañas
           </Link>
           <Link
             href="/tasks/like"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
+            className="inline-flex items-center gap-1.5 rounded border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary transition-colors duration-100 hover:text-ink"
           >
             <Heart className="h-4 w-4" /> Campaña de likes
           </Link>
           <Link
             href="/tasks/likecomment"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
+            className="inline-flex items-center gap-1.5 rounded border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary transition-colors duration-100 hover:text-ink"
           >
             <MessageCircleHeart className="h-4 w-4" /> Likes a comentarios
           </Link>
           <Link
             href="/tasks/comment"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
+            className="inline-flex items-center gap-1.5 rounded border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary transition-colors duration-100 hover:text-ink"
           >
             <MessageSquare className="h-4 w-4" /> Campaña de comentarios
           </Link>
           <Link
             href="/tasks/ramificacion"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
+            className="inline-flex items-center gap-1.5 rounded border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary transition-colors duration-100 hover:text-ink"
           >
             <GitBranch className="h-4 w-4" /> Ramificaciones
           </Link>
           <Link
             href="/tasks/post"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
+            className="inline-flex items-center gap-1.5 rounded border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary transition-colors duration-100 hover:text-ink"
           >
             <Megaphone className="h-4 w-4" /> Campaña de publicaciones
           </Link>
           <Link
             href="/tasks/warmup"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
+            className="inline-flex items-center gap-1.5 rounded border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary transition-colors duration-100 hover:text-ink"
           >
             <Activity className="h-4 w-4" /> Campaña de warmup
           </Link>
           <Link
             href="/tasks/new"
-            className="glow-btn inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-fg shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+            className="glow-btn inline-flex items-center gap-1.5 rounded bg-primary px-3 py-2 text-sm font-medium text-primary-fg transition-colors duration-100"
           >
             <Plus className="h-4 w-4" /> Nueva tarea
           </Link>
@@ -269,14 +269,14 @@ function TasksContent() {
             type="button"
             disabled={stopping}
             onClick={stopCampaigns}
-            className="glow-btn-critical inline-flex items-center gap-1.5 rounded-lg bg-critical px-3 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md disabled:pointer-events-none disabled:opacity-50"
+            className="glow-btn-critical inline-flex items-center gap-1.5 rounded bg-critical px-3 py-2 text-sm font-medium text-white transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50"
           >
             <OctagonX className="h-4 w-4" /> {stopping ? "Deteniendo..." : "Parar campañas"}
           </button>
         </div>
       </div>
 
-      {error && <p className="rounded-xl bg-critical/10 p-3 text-sm text-critical">{error}</p>}
+      {error && <p className="rounded-lg bg-critical/10 p-3 text-sm text-critical">{error}</p>}
 
       <Card className="flex flex-wrap items-center gap-2 p-3">
         <div className="relative min-w-50 flex-1">

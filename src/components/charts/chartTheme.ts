@@ -19,4 +19,4 @@ export const BASELINE_STROKE = "var(--baseline)";
 // Clases del contenedor del tooltip. La sombra larguísima y muy difusa es lo
 // que lo despega del panel sin necesidad de un borde fuerte.
 export const TOOLTIP_BOX =
-  "rounded-[9px] border border-hairline-hi bg-[var(--page-plane)] px-3 py-2 font-mono text-[11px] shadow-[0_12px_30px_rgba(0,0,0,0.65)]";
+  "rounded-lg border border-hairline bg-surface px-3 py-2 font-mono text-[11px] shadow-[var(--shadow-flyout)]";

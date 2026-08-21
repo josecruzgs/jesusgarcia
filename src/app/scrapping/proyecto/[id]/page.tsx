@@ -168,7 +168,7 @@ const SENTIMENT_SERIES = [
 ] as const;
 
 const inputClass =
-  "rounded-[9px] border border-hairline bg-page px-3 py-2 text-sm outline-none transition-colors focus:border-primary";
+  "rounded border border-hairline bg-page px-3 py-2 text-sm outline-none transition-colors focus:border-primary";
 
 /** Cifra con una línea que explica qué mide, para que el dato no quede solo. */
 function Kpi({
@@ -524,7 +524,7 @@ export default function ProyectoPage({ params }: { params: Promise<{ id: string 
             <ArrowLeft className="h-3.5 w-3.5" /> Escucha
           </Link>
           <div className="mt-2 flex items-center gap-2.5">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] accent-fill border">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded accent-fill border">
               <ElementIcon name="viento" size={18} />
             </span>
             <div className="min-w-0">
@@ -582,12 +582,12 @@ export default function ProyectoPage({ params }: { params: Promise<{ id: string 
       </div>
 
       {error && (
-        <p className="rounded-[9px] border border-critical/40 bg-critical/10 p-3 text-sm text-critical">
+        <p className="rounded border border-critical/40 bg-critical/10 p-3 text-sm text-critical">
           {error}
         </p>
       )}
       {notice && (
-        <p className="rounded-[9px] border border-hairline bg-surface-2 p-3 font-mono text-[11px] text-ink-secondary">
+        <p className="rounded border border-hairline bg-surface-2 p-3 font-mono text-[11px] text-ink-secondary">
           {notice}
         </p>
       )}
@@ -609,7 +609,7 @@ export default function ProyectoPage({ params }: { params: Promise<{ id: string 
                 setTo(todayIso);
                 setPage(1);
               }}
-              className={`rounded-[7px] border px-2.5 py-1 font-mono text-[11px] transition-colors ${
+              className={`rounded border px-2.5 py-1 font-mono text-[11px] transition-colors ${
                 active ? "accent-fill" : "border-hairline text-ink-secondary hover:text-ink"
               }`}
             >
@@ -1016,7 +1016,7 @@ export default function ProyectoPage({ params }: { params: Promise<{ id: string 
                 key={b._id}
                 onClick={() => setBrief(b)}
                 title={`${b.snapshot?.mentions ?? 0} menciones · sentimiento ${b.snapshot?.avgScore ?? "—"}`}
-                className={`rounded-[7px] border px-2.5 py-1 font-mono text-[10.5px] transition-colors ${
+                className={`rounded border px-2.5 py-1 font-mono text-[10.5px] transition-colors ${
                   brief?._id === b._id
                     ? "accent-fill"
                     : "border-hairline text-ink-secondary hover:text-ink"
@@ -1122,7 +1122,7 @@ export default function ProyectoPage({ params }: { params: Promise<{ id: string 
           </button>
           <button
             onClick={saveSettings}
-            className="rounded-[9px] bg-primary px-4 py-2 text-sm font-semibold text-primary-fg"
+            className="rounded bg-primary px-4 py-2 text-sm font-semibold text-primary-fg"
           >
             Guardar
           </button>
@@ -1205,7 +1205,7 @@ function WindowStrip({
             onClick={() =>
               window.briefId ? onView(window.briefId) : onGenerate(window.startDay)
             }
-            className={`rounded-[7px] border px-2 py-1 font-mono text-[10px] transition-colors disabled:cursor-not-allowed ${tone}`}
+            className={`rounded border px-2 py-1 font-mono text-[10px] transition-colors disabled:cursor-not-allowed ${tone}`}
           >
             {label}
           </button>
@@ -1281,7 +1281,7 @@ function BriefList({
           return (
             <li key={i} className="flex gap-2.5 text-[12.5px] leading-snug text-ink-secondary">
               <span
-                className="mt-px grid h-5 w-5 shrink-0 place-items-center rounded-[6px] border"
+                className="mt-px grid h-5 w-5 shrink-0 place-items-center rounded border"
                 style={{
                   color,
                   borderColor: `color-mix(in srgb, ${color} 35%, transparent)`,

@@ -237,13 +237,13 @@ export default function ShareDashboardsPage() {
         <button
           type="button"
           onClick={openCreateForm}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+          className="inline-flex items-center gap-1.5 rounded bg-primary px-3 py-2 text-sm font-medium text-white transition-colors duration-100"
         >
           <Plus className="h-4 w-4" /> Nuevo dashboard
         </button>
       </div>
 
-      {error && <p className="rounded-xl bg-critical/10 p-3 text-sm text-critical">{error}</p>}
+      {error && <p className="rounded-lg bg-critical/10 p-3 text-sm text-critical">{error}</p>}
 
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
@@ -364,10 +364,10 @@ export default function ShareDashboardsPage() {
 
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
               <div className="flex flex-col gap-4">
-                {formError && <p className="rounded-xl bg-critical/10 p-3 text-sm text-critical">{formError}</p>}
+                {formError && <p className="rounded-lg bg-critical/10 p-3 text-sm text-critical">{formError}</p>}
 
                 {createdLink && (
-                  <div className="flex flex-col gap-2 rounded-xl border border-success/40 bg-success/10 p-3">
+                  <div className="flex flex-col gap-2 rounded-lg border border-success/40 bg-success/10 p-3">
                     <p className="text-sm font-medium text-success">Dashboard creado. Comparte este enlace:</p>
                     <div className="flex items-center gap-2">
                       <input
@@ -412,7 +412,7 @@ export default function ShareDashboardsPage() {
                       className="w-full rounded-lg border border-hairline bg-page py-2 pl-9 pr-3 text-sm outline-none transition-colors focus:border-primary"
                     />
                   </div>
-                  <div className="mt-2 max-h-64 overflow-y-auto rounded-xl border border-hairline">
+                  <div className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-hairline">
                     {campaignsLoading ? (
                       <p className="p-4 text-center text-sm text-ink-muted">Cargando campañas...</p>
                     ) : filteredCampaignOptions.length === 0 ? (

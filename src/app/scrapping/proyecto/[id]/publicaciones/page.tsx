@@ -20,7 +20,7 @@ const TABS = [
 ] as const;
 
 const inputClass =
-  "rounded-[9px] border border-hairline bg-page px-3 py-2 text-sm outline-none transition-colors focus:border-primary";
+  "rounded border border-hairline bg-page px-3 py-2 text-sm outline-none transition-colors focus:border-primary";
 
 export default function PublicacionesPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -262,12 +262,12 @@ export default function PublicacionesPage({ params }: { params: Promise<{ id: st
       />
 
       {error && (
-        <p className="rounded-[9px] border border-critical/40 bg-critical/10 p-3 text-sm text-critical">
+        <p className="rounded border border-critical/40 bg-critical/10 p-3 text-sm text-critical">
           {error}
         </p>
       )}
       {notice && (
-        <p className="rounded-[9px] border border-hairline bg-surface-2 p-3 font-mono text-[11px] text-ink-secondary">
+        <p className="rounded border border-hairline bg-surface-2 p-3 font-mono text-[11px] text-ink-secondary">
           {notice}
         </p>
       )}
@@ -383,7 +383,7 @@ export default function PublicacionesPage({ params }: { params: Promise<{ id: st
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`rounded-[7px] border px-2.5 py-1 font-mono text-[11px] transition-colors ${
+                className={`rounded border px-2.5 py-1 font-mono text-[11px] transition-colors ${
                   tab === t.key ? "accent-fill" : "border-hairline text-ink-secondary hover:text-ink"
                 }`}
               >
@@ -436,7 +436,7 @@ export default function PublicacionesPage({ params }: { params: Promise<{ id: st
             </p>
 
             {tooManyForTexts && (
-              <p className="rounded-[9px] border border-critical/40 bg-critical/10 p-3 text-[12.5px] text-critical">
+              <p className="rounded border border-critical/40 bg-critical/10 p-3 text-[12.5px] text-critical">
                 Elegiste {selected.size} cuentas y hay {dispatching.comments.length} textos. Dos
                 cuentas tendrían que publicar el mismo comentario en la misma publicación. Quitá
                 cuentas, o cerrá y agregá más textos con “Editar”.
@@ -444,7 +444,7 @@ export default function PublicacionesPage({ params }: { params: Promise<{ id: st
             )}
 
             {!tooManyForTexts && dispatching.kind === "like" && selected.size > suggestedCount && (
-              <p className="rounded-[9px] border border-amber/40 bg-amber/10 p-3 text-[12.5px] text-amber">
+              <p className="rounded border border-amber/40 bg-amber/10 p-3 text-[12.5px] text-amber">
                 Elegiste {selected.size} cuentas y la recomendación era {suggestedCount}. Más volumen
                 del necesario en un mismo post es lo que hace que se lea como operación.
               </p>
@@ -498,7 +498,7 @@ export default function PublicacionesPage({ params }: { params: Promise<{ id: st
           <button
             onClick={confirmDispatch}
             disabled={busy || selected.size === 0 || tooManyForTexts}
-            className="rounded-[9px] bg-primary px-4 py-2 text-sm font-semibold text-primary-fg disabled:opacity-50"
+            className="rounded bg-primary px-4 py-2 text-sm font-semibold text-primary-fg disabled:opacity-50"
           >
             Activar con {selected.size} cuenta{selected.size === 1 ? "" : "s"}
           </button>

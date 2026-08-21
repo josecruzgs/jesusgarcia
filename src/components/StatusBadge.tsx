@@ -48,7 +48,7 @@ export default function StatusBadge({ status }: { status: string }) {
 
   return (
     <span
-      className="inline-flex w-30 items-center justify-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 py-1 font-mono text-[9.5px] font-medium uppercase tracking-[0.08em]"
+      className="inline-flex w-30 items-center justify-center gap-1.5 whitespace-nowrap rounded px-2 py-1 font-mono text-[9.5px] font-medium uppercase tracking-[0.08em]"
       style={{
         color: c,
         background: `color-mix(in srgb, ${c} 12%, transparent)`,

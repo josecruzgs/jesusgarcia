@@ -76,7 +76,7 @@ function LoginForm() {
         </div>
 
         {error && (
-          <p className="rounded-[7px] border border-critical/40 bg-critical/10 p-2 text-center font-mono text-[11px] text-critical">
+          <p className="rounded border border-critical/40 bg-critical/10 p-2 text-center font-mono text-[11px] text-critical">
             {error}
           </p>
         )}
@@ -91,7 +91,7 @@ function LoginForm() {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           placeholder="Usuario"
-          className="rounded-[9px] border border-hairline bg-page px-3 py-2.5 text-sm outline-none transition-colors focus:border-gold"
+          className="rounded border border-hairline bg-page px-3 py-2.5 text-sm outline-none transition-colors focus:border-gold"
         />
 
         <input
@@ -101,12 +101,12 @@ function LoginForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Contraseña"
-          className="rounded-[9px] border border-hairline bg-page px-3 py-2.5 text-sm outline-none transition-colors focus:border-gold"
+          className="rounded border border-hairline bg-page px-3 py-2.5 text-sm outline-none transition-colors focus:border-gold"
         />
 
         <button
           disabled={loading || !username || !password}
-          className="glow-btn rounded-[9px] bg-primary px-4 py-2.5 text-sm font-semibold text-primary-fg shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md disabled:pointer-events-none disabled:opacity-50"
+          className="glow-btn rounded bg-primary px-4 py-2.5 text-sm font-semibold text-primary-fg transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50"
         >
           {loading ? "Entrando..." : "Entrar"}
         </button>

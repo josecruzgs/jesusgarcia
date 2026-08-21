@@ -56,7 +56,7 @@ const SOURCE_LABELS: { key: string; label: string; hint: string }[] = [
 const BRIGHT_DATA_PLATFORMS = ["x", "instagram", "tiktok", "facebook", "linkedin"];
 
 const inputClass =
-  "w-full rounded-[9px] border border-hairline bg-page px-3 py-2 text-sm outline-none transition-colors focus:border-primary";
+  "w-full rounded border border-hairline bg-page px-3 py-2 text-sm outline-none transition-colors focus:border-primary";
 
 /** Convierte una lista a texto multilínea y de vuelta, sin perder el orden. */
 function toText(list: string[]): string {
@@ -251,7 +251,7 @@ export default function ProjectForm({
                         : [...draft.brightDataPlatforms, platform],
                     )
                   }
-                  className={`rounded-[9px] border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors ${
+                  className={`rounded border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors ${
                     active ? "accent-fill" : "border-hairline text-ink-secondary hover:text-ink"
                   }`}
                 >

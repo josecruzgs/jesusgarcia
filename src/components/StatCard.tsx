@@ -51,7 +51,7 @@ export default function StatCard({
   col?: PanelCol;
 }) {
   const c = ACCENT_VALUES[accent];
-  const className = `kpi-glass c${col} relative flex min-h-26 flex-col px-4.5 py-4 ${href ? "kpi-lift" : ""}`;
+  const className = `kpi-card c${col} relative flex min-h-26 flex-col px-4.5 py-4 ${href ? "kpi-lift" : ""}`;
 
   const content = (
     <>

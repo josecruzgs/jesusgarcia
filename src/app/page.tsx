@@ -302,7 +302,7 @@ export default async function Home() {
         {escucha.mentions30d === 0 ? (
           <Panel col={12} accent="var(--el-viento)">
             <div className="flex flex-col items-center gap-3 py-8 text-center">
-              <span className="grid h-12 w-12 place-items-center rounded-2xl accent-fill border">
+              <span className="grid h-12 w-12 place-items-center rounded-lg accent-fill border">
                 <ElementIcon name="viento" size={22} />
               </span>
               <p className="max-w-md text-[13px] leading-relaxed text-ink-secondary">
@@ -384,7 +384,7 @@ export default async function Home() {
                   {escucha.topTopics.map((t, i) => (
                     <span
                       key={t.name}
-                      className="rounded-[7px] border px-2.5 py-1 font-mono text-[11px]"
+                      className="rounded border px-2.5 py-1 font-mono text-[11px]"
                       style={{
                         borderColor: `color-mix(in srgb, var(--gold) ${Math.max(20, 60 - i * 6)}%, transparent)`,
                         color: i < 3 ? "var(--gold)" : "var(--text-secondary)",
@@ -431,7 +431,7 @@ export default async function Home() {
             >
               <div className="flex items-center gap-2.5">
                 <span
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border"
                   style={{
                     color,
                     borderColor: `color-mix(in srgb, ${color} 40%, transparent)`,

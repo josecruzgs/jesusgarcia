@@ -114,13 +114,13 @@ export default function Topbar() {
   }, []);
 
   return (
-    <header className="glass-bar sticky top-0 z-10 flex flex-wrap items-center gap-3 px-6 py-3">
+    <header className="app-bar sticky top-0 z-10 flex flex-wrap items-center gap-3 px-6 py-3">
       {/* Marca del elemento en curso: cuadro relleno + nombre + rol, igual
           que el encabezado de vista de la sala. Los cuatro elementos y las
           páginas generales comparten el acento, así que el cuadro se pinta
           con --primary y su tinta legible. */}
       <div key={element ?? "general"} className="animate-rise flex min-w-0 items-center gap-2.5">
-        <span className="accent-fill grid h-8 w-8 shrink-0 place-items-center rounded-[10px] border">
+        <span className="accent-fill grid h-8 w-8 shrink-0 place-items-center rounded border">
           <ElementIcon name={element ?? "eye"} size={16} />
         </span>
         <div className="min-w-0">

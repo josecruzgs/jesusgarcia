@@ -90,7 +90,7 @@ const TYPE_ROUTES: Record<string, string> = {
 
 export default function CampaignsPage() {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse-soft rounded-2xl bg-surface" />}>
+    <Suspense fallback={<div className="h-64 animate-pulse-soft rounded-lg bg-surface" />}>
       <CampaignsContent />
     </Suspense>
   );
@@ -327,7 +327,7 @@ function CampaignsContent() {
     <div className="flex animate-fade-in-up flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] accent-fill border">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded accent-fill border">
             <ElementIcon name="agua" size={18} />
           </span>
           <div className="min-w-0">
@@ -338,38 +338,38 @@ function CampaignsContent() {
         <div className="flex flex-wrap gap-2">
           <Link
             href="/campanas/compartir"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
+            className="inline-flex items-center gap-1.5 rounded border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary transition-colors duration-100 hover:text-ink"
           >
             <Share2 className="h-4 w-4" /> Compartir
           </Link>
           <Link
             href="/tasks/like"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
+            className="inline-flex items-center gap-1.5 rounded border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary transition-colors duration-100 hover:text-ink"
           >
             <Heart className="h-4 w-4" /> Likes
           </Link>
           <Link
             href="/tasks/comment"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
+            className="inline-flex items-center gap-1.5 rounded border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary transition-colors duration-100 hover:text-ink"
           >
             <MessageSquare className="h-4 w-4" /> Comentarios
           </Link>
           <Link
             href="/tasks/post"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
+            className="inline-flex items-center gap-1.5 rounded border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary transition-colors duration-100 hover:text-ink"
           >
             <Megaphone className="h-4 w-4" /> Publicaciones
           </Link>
           <Link
             href="/tasks/warmup"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:text-ink hover:shadow-md"
+            className="inline-flex items-center gap-1.5 rounded border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary transition-colors duration-100 hover:text-ink"
           >
             <Activity className="h-4 w-4" /> Warmup
           </Link>
         </div>
       </div>
 
-      {error && <p className="rounded-xl bg-critical/10 p-3 text-sm text-critical">{error}</p>}
+      {error && <p className="rounded-lg bg-critical/10 p-3 text-sm text-critical">{error}</p>}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Card className="p-4">
@@ -628,19 +628,19 @@ function CampaignsContent() {
 
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
               {detailLoading && !detail ? (
-                <div className="h-48 animate-pulse-soft rounded-xl bg-page" />
+                <div className="h-48 animate-pulse-soft rounded-lg bg-page" />
               ) : detail ? (
                 <div className="flex flex-col gap-4">
                   <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
                     {Object.entries(detail.campaign.counts).map(([key, value]) => (
-                      <div key={key} className="rounded-xl border border-hairline bg-page p-3">
+                      <div key={key} className="rounded-lg border border-hairline bg-page p-3">
                         <p className="label-mono">{key}</p>
                         <p className="mt-1 text-lg font-semibold text-ink">{value}</p>
                       </div>
                     ))}
                   </div>
 
-                  <div className="overflow-x-auto rounded-xl border border-hairline">
+                  <div className="overflow-x-auto rounded-lg border border-hairline">
                     <table className="w-full text-sm">
                       <thead className="border-b border-hairline text-left text-xs uppercase tracking-wide text-ink-muted">
                         <tr>

@@ -59,9 +59,9 @@ export default async function PantallaPage() {
 function NoHayVisor({ sinNginx, url }: { sinNginx: boolean; url: string }) {
   return (
     <div className="grid min-h-full place-items-center px-6 py-10">
-      <div className="card-surface flex w-full max-w-2xl flex-col gap-4 rounded-2xl p-6">
+      <div className="card-surface flex w-full max-w-2xl flex-col gap-4 rounded-lg p-6">
         <div className="flex items-center gap-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border border-hairline text-ink-muted">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded border border-hairline text-ink-muted">
             <MonitorOff className="h-4 w-4" />
           </span>
           <div>
@@ -80,13 +80,13 @@ function NoHayVisor({ sinNginx, url }: { sinNginx: boolean; url: string }) {
               La pantalla vive en el VPS, y en producción la sirve nginx en <code className="font-mono">/vnc/</code>.
               Corriendo la app en tu máquina ese camino no existe. Para verla desde acá, abrí el túnel:
             </p>
-            <pre className="overflow-x-auto rounded-xl border border-hairline bg-page p-3 font-mono text-[11px] leading-relaxed text-ink-secondary">
+            <pre className="overflow-x-auto rounded-lg border border-hairline bg-page p-3 font-mono text-[11px] leading-relaxed text-ink-secondary">
 ssh -N -L 6080:127.0.0.1:6080 godeye@177.7.53.246
             </pre>
             <p className="text-[13px] leading-relaxed text-ink-secondary">
               y poné esto en tu <code className="font-mono">.env.local</code>, reiniciando el server:
             </p>
-            <pre className="overflow-x-auto rounded-xl border border-hairline bg-page p-3 font-mono text-[11px] leading-relaxed text-ink-secondary">
+            <pre className="overflow-x-auto rounded-lg border border-hairline bg-page p-3 font-mono text-[11px] leading-relaxed text-ink-secondary">
 VNC_URL=http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=scale
             </pre>
           </>
@@ -95,7 +95,7 @@ VNC_URL=http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=scale
             <p className="text-[13px] leading-relaxed text-ink-secondary">
               La pantalla virtual o su visor no están corriendo en el servidor. En el VPS:
             </p>
-            <pre className="overflow-x-auto rounded-xl border border-hairline bg-page p-3 font-mono text-[11px] leading-relaxed text-ink-secondary">
+            <pre className="overflow-x-auto rounded-lg border border-hairline bg-page p-3 font-mono text-[11px] leading-relaxed text-ink-secondary">
 systemctl status xvfb x11vnc websockify
 sudo systemctl restart x11vnc websockify
             </pre>

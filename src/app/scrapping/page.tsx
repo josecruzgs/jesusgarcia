@@ -89,7 +89,7 @@ export default function EscuchaPage() {
     <div className="flex animate-fade-in-up flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] accent-fill border">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded accent-fill border">
             <ElementIcon name="viento" size={18} />
           </span>
           <div className="min-w-0">
@@ -105,7 +105,7 @@ export default function EscuchaPage() {
               setDraft(EMPTY_DRAFT);
               setCreating(true);
             }}
-            className="glow-btn inline-flex items-center gap-1.5 rounded-[9px] bg-primary px-3 py-2 text-sm font-semibold text-primary-fg shadow-sm transition-all duration-200 hover:-translate-y-0.5"
+            className="glow-btn inline-flex items-center gap-1.5 rounded bg-primary px-3 py-2 text-sm font-semibold text-primary-fg transition-colors duration-100"
           >
             <Plus className="h-4 w-4" /> Nuevo proyecto
           </button>
@@ -113,7 +113,7 @@ export default function EscuchaPage() {
       </div>
 
       {error && (
-        <p className="rounded-[9px] border border-critical/40 bg-critical/10 p-3 text-sm text-critical">
+        <p className="rounded border border-critical/40 bg-critical/10 p-3 text-sm text-critical">
           {error}
         </p>
       )}
@@ -133,12 +133,12 @@ export default function EscuchaPage() {
       {loading ? (
         <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-40 animate-pulse-soft rounded-[14px] bg-surface-2" />
+            <div key={i} className="h-40 animate-pulse-soft rounded-lg bg-surface-2" />
           ))}
         </div>
       ) : projects.length === 0 ? (
         <div className="card-surface flex flex-col items-center gap-3 px-8 py-14 text-center">
-          <span className="grid h-14 w-14 place-items-center rounded-2xl accent-fill border">
+          <span className="grid h-14 w-14 place-items-center rounded-lg accent-fill border">
             <ElementIcon name="viento" size={26} />
           </span>
           <h2 className="font-display text-xl font-semibold text-ink">Todavía no escuchas a nadie</h2>
@@ -148,7 +148,7 @@ export default function EscuchaPage() {
           </p>
           <button
             onClick={() => setCreating(true)}
-            className="glow-btn mt-1 inline-flex items-center gap-1.5 rounded-[9px] bg-primary px-4 py-2 text-sm font-semibold text-primary-fg"
+            className="glow-btn mt-1 inline-flex items-center gap-1.5 rounded bg-primary px-4 py-2 text-sm font-semibold text-primary-fg"
           >
             <Plus className="h-4 w-4" /> Crear el primero
           </button>
@@ -209,7 +209,7 @@ export default function EscuchaPage() {
           <button
             onClick={create}
             disabled={saving || !draft.name.trim() || !draft.entities.some((e) => e.name.trim())}
-            className="rounded-[9px] bg-primary px-4 py-2 text-sm font-semibold text-primary-fg transition-all disabled:pointer-events-none disabled:opacity-50"
+            className="rounded bg-primary px-4 py-2 text-sm font-semibold text-primary-fg transition-all disabled:pointer-events-none disabled:opacity-50"
           >
             {saving ? "Creando..." : "Crear proyecto"}
           </button>

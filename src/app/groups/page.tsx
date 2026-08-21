@@ -100,14 +100,14 @@ export default function GroupsPage() {
         <button
           onClick={sync}
           disabled={syncing}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-2 text-sm font-medium shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded border border-hairline bg-surface px-3 py-2 text-sm font-medium transition-colors duration-100 disabled:opacity-50"
         >
           <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
           {syncing ? "Sincronizando..." : "Sincronizar con Sistema"}
         </button>
       </div>
 
-      {error && <p className="rounded-xl bg-critical/10 p-3 text-sm text-critical">{error}</p>}
+      {error && <p className="rounded-lg bg-critical/10 p-3 text-sm text-critical">{error}</p>}
 
       <Card className="p-4">
         <form onSubmit={createGroup} className="flex flex-wrap items-end gap-3">
@@ -131,7 +131,7 @@ export default function GroupsPage() {
           </div>
           <button
             disabled={creating}
-            className="glow-btn inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-fg shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50"
+            className="glow-btn inline-flex items-center gap-1.5 rounded bg-primary px-3 py-2 text-sm font-medium text-primary-fg transition-colors duration-100 disabled:opacity-50"
           >
             <Plus className="h-4 w-4" />
             {creating ? "Creando..." : "Crear grupo"}

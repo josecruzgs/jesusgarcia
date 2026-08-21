@@ -579,7 +579,7 @@ export default function AutoProfilePage() {
 
       <button
         disabled={creating || count === 0 || !settings.profileEditUrl || missing.length > 0}
-        className="glow-btn w-fit rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-fg shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md disabled:pointer-events-none disabled:opacity-50"
+        className="glow-btn w-fit rounded bg-primary px-4 py-2 text-sm font-medium text-primary-fg transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50"
       >
         {creating ? "Creando..." : `Crear campaña de Auto Profile (${count || 0})`}
       </button>
@@ -594,7 +594,7 @@ export default function AutoProfilePage() {
           <ArrowLeft className="h-3.5 w-3.5" /> Perfiles
         </Link>
         <div className="mt-2 flex items-center gap-2.5">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] accent-fill border">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded accent-fill border">
             <UserCog className="h-4.5 w-4.5" />
           </span>
           <h1 className="text-2xl font-semibold text-ink">Auto Profile</h1>
@@ -604,7 +604,7 @@ export default function AutoProfilePage() {
         </p>
       </div>
 
-      {error && <p className="rounded-xl bg-critical/10 p-3 text-sm text-critical">{error}</p>}
+      {error && <p className="rounded-lg bg-critical/10 p-3 text-sm text-critical">{error}</p>}
 
       {result && (
         <Card className="flex animate-fade-in-up flex-col gap-3 border-success/20 bg-success/5 p-4 text-sm">
@@ -649,7 +649,7 @@ export default function AutoProfilePage() {
           role="tab"
           aria-selected={mode === "sheet"}
           onClick={() => setMode("sheet")}
-          className={`inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-all duration-150 ${
+          className={`inline-flex items-center gap-1.5 rounded px-3 py-2 text-sm font-medium transition-all duration-150 ${
             mode === "sheet" ? "bg-primary text-primary-fg shadow-sm" : "text-ink-secondary hover:bg-page hover:text-ink"
           }`}
         >
@@ -660,7 +660,7 @@ export default function AutoProfilePage() {
           role="tab"
           aria-selected={mode === "manual"}
           onClick={() => setMode("manual")}
-          className={`inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-all duration-150 ${
+          className={`inline-flex items-center gap-1.5 rounded px-3 py-2 text-sm font-medium transition-all duration-150 ${
             mode === "manual" ? "bg-primary text-primary-fg shadow-sm" : "text-ink-secondary hover:bg-page hover:text-ink"
           }`}
         >
@@ -709,7 +709,7 @@ export default function AutoProfilePage() {
               </div>
               <button
                 disabled={loadingPreview || !sheetUrl.trim()}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-fg shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md disabled:pointer-events-none disabled:opacity-50"
+                className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-fg transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50"
               >
                 {loadingPreview ? "Leyendo..." : "Leer sheet"}
               </button>
