@@ -258,6 +258,30 @@ const FACEBOOK_ACTION_ROW_LABELS = [
 ];
 
 /** Cómo se rotula el botón de responder, por idioma de la interfaz. */
+/**
+ * "Compartir" es el vecino decisivo: identifica la barra de acciones de una
+ * publicación porque un comentario no se comparte. Sale de
+ * FACEBOOK_ACTION_ROW_LABELS, que mezclaba esto con los rótulos de comentar —
+ * y esos aparecen también alrededor de un comentario ("Escribe un comentario",
+ * "Comentar como X"), así que como señal valen menos.
+ */
+const FACEBOOK_SHARE_LABELS = ["Compartir", "Share", "Partager", "Compartilhar", "Condividi", "Teilen"];
+
+/**
+ * Cómo se presenta el contenedor de un comentario. Facebook le pone al
+ * `role="article"` de cada comentario un aria-label con el autor: "Comentario
+ * de Fulano", "Comment by Fulano".
+ */
+const FACEBOOK_COMMENT_ARTICLE_LABELS = [
+  "Comentario de",
+  "Comment by",
+  "Respuesta de",
+  "Reply by",
+  "Commentaire de",
+  "Commento di",
+  "Kommentar von",
+];
+
 const FACEBOOK_REPLY_LABELS = [
   "Responder",
   "Reply",
@@ -712,7 +736,7 @@ type PostLikeProbe = {
 async function markFacebookPostLike(page: Page): Promise<PostLikeProbe> {
   await defineEsbuildNameHelper(page);
   return page.evaluate(
-    ({ likeMark, likedMark, likePatterns, unlikePatterns, rowLabels }): PostLikeProbe => {
+    ({ likeMark, likedMark, likePatterns, unlikePatterns, rowLabels, shareLabels, replyLabels, commentArticleLabels }): PostLikeProbe => {
       // Sin acentos y en minúsculas: "Gefällt mir" y "gefallt mir" son el mismo
       // botón, y el rótulo no siempre respeta el capitalizado entre layouts.
       const normalizar = (valor: string) =>
@@ -752,45 +776,106 @@ async function markFacebookPostLike(page: Page): Promise<PostLikeProbe> {
         },
       );
 
-      // La compañía es lo que distingue al botón del post del de un comentario:
-      // el del post comparte fila con "Comentar…" y "Compartir…", el de un
-      // comentario vive al lado de "Responder". Por subcadena porque esos
-      // vecinos también traen la frase larga ("Comentar la publicación de X").
-      const enBarraDeAcciones = (el: HTMLElement) => {
-        let nodo: HTMLElement | null = el;
-        for (let i = 0; i < 4; i += 1) {
-          nodo = nodo?.parentElement ?? null;
-          if (!nodo) return false;
-          const vecinos = Array.from(nodo.querySelectorAll('[role="button"], button')) as HTMLElement[];
-          if (vecinos.some((v) => v !== el && contiene(nombreDe(v), rowLabels))) return true;
+      // La fila de acciones a la que pertenece un botón.
+      //
+      // Se sube por el árbol mientras el ancestro siga siendo "chico" en
+      // botones. Ese corte es lo que evita el error de antes: subiendo un
+      // número fijo de niveles, el barrido desde un comentario terminaba
+      // alcanzando la barra del post y lo daba por bueno. Una fila de acciones
+      // tiene tres botones; en cuanto el ancestro tiene muchos más, ya salimos
+      // de la fila y estamos mirando el post entero.
+      const filaDe = (el: HTMLElement) => {
+        let fila: HTMLElement = el;
+        let nodo: HTMLElement | null = el.parentElement;
+        for (let i = 0; i < 6 && nodo; i += 1) {
+          if (nodo.querySelectorAll('[role="button"], button').length > 6) break;
+          fila = nodo;
+          nodo = nodo.parentElement;
+        }
+        return fila;
+      };
+
+      const vecinosDe = (el: HTMLElement) =>
+        (Array.from(filaDe(el).querySelectorAll('[role="button"], button')) as HTMLElement[])
+          .filter((v) => v !== el)
+          .map(nombreDe);
+
+      // Un comentario se anuncia solo: su contenedor lleva un aria-label del
+      // tipo "Comentario de Fulano". Se mira eso y no la anidación de
+      // `role="article"`, porque Facebook también anida artículos por otros
+      // motivos —una publicación compartida dentro de otra, sin ir más lejos—
+      // y con esa regla se descartaba el botón bueno.
+      const enComentario = (el: HTMLElement) => {
+        let nodo: Element | null = el.closest('[role="article"]');
+        for (let i = 0; i < 4 && nodo; i += 1) {
+          if (contiene(ariaOf(nodo), commentArticleLabels)) return true;
+          nodo = nodo.parentElement?.closest('[role="article"]') ?? null;
         }
         return false;
       };
 
-      // Y esto es lo que los separa de verdad: un comentario —y una respuesta a
-      // un comentario— es un `role="article"` metido dentro del `role="article"`
-      // del post. El vecindario por sí solo no alcanzaba: subiendo cuatro
-      // niveles, el `querySelectorAll` de un comentario termina alcanzando la
-      // barra de acciones del post y lo daba por bueno, así que se acababa
-      // reaccionando a un comentario en vez de a la publicación.
-      const esDeComentario = (el: HTMLElement) => {
-        const article = el.closest('[role="article"]');
-        return Boolean(article && article.parentElement?.closest('[role="article"]'));
+      // Cuánto se parece al botón del post. Ninguna señal alcanza sola, así que
+      // se suman y gana la mejor: si la evidencia fuerte no aparece —porque
+      // Facebook cambió un rótulo— todavía queda la débil, y antes de rendirse
+      // se acepta un candidato sin señales, que es lo que se hacía siempre.
+      const puntajeDe = (el: HTMLElement) => {
+        if (enComentario(el)) return -1;
+        const vecinos = vecinosDe(el);
+        // "Compartir" es la señal decisiva: un comentario no se comparte.
+        if (vecinos.some((n) => contiene(n, shareLabels))) return 3;
+        // "Responder" al lado es de un comentario, aunque no lo dijera el
+        // contenedor.
+        if (vecinos.some((n) => contiene(n, replyLabels))) return -1;
+        if (vecinos.some((n) => contiene(n, rowLabels))) return 2;
+        return 1;
       };
 
-      const delPost = (el: HTMLElement) => !esDeComentario(el) && enBarraDeAcciones(el);
+      const mejor = (candidatos: HTMLElement[]) => {
+        let elegido: HTMLElement | null = null;
+        let mejorPuntaje = 0;
+        for (const el of candidatos) {
+          const puntaje = puntajeDe(el);
+          // Estrictamente mayor: ante empate gana el primero del documento,
+          // que en una publicación abierta es el de arriba de todo.
+          if (puntaje > mejorPuntaje) {
+            mejorPuntaje = puntaje;
+            elegido = el;
+          }
+        }
+        return { elegido, puntaje: mejorPuntaje };
+      };
 
-      const yaPuesto = botones.filter((el) => coincide(nombreDe(el), unlikePatterns)).find(delPost) ?? null;
-      if (yaPuesto) {
-        yaPuesto.setAttribute(likedMark, "1");
-        yaPuesto.scrollIntoView({ block: "center" });
-        return { status: "already_liked", detail: nombreDe(yaPuesto).slice(0, 60) };
+      const comoSeEligio = (puntaje: number) =>
+        puntaje >= 3 ? "fila con Compartir" : puntaje === 2 ? "fila de acciones" : "sin señales de fila";
+
+      const puesto = mejor(botones.filter((el) => coincide(nombreDe(el), unlikePatterns)));
+      if (puesto.elegido) {
+        puesto.elegido.setAttribute(likedMark, "1");
+        puesto.elegido.scrollIntoView({ block: "center" });
+        return {
+          status: "already_liked",
+          detail: `${nombreDe(puesto.elegido).slice(0, 60)} (${comoSeEligio(puesto.puntaje)})`,
+        };
       }
 
-      const boton = botones.filter((el) => coincide(nombreDe(el), likePatterns)).find(delPost) ?? null;
-      if (!boton) {
-        return { status: "not_found", detail: `${botones.length} boton(es) mirados` };
+      const candidatos = botones.filter((el) => coincide(nombreDe(el), likePatterns));
+      const { elegido, puntaje } = mejor(candidatos);
+      if (!elegido) {
+        // El detalle es para el registro de la tarea: si todos los candidatos
+        // quedaron descartados por vivir en un comentario, se ve acá y no hay
+        // que adivinar.
+        const descartados = candidatos
+          .slice(0, 4)
+          .map((el) => `"${nombreDe(el).slice(0, 30)}"${enComentario(el) ? " [en comentario]" : ""}`)
+          .join(", ");
+        return {
+          status: "not_found",
+          detail: `${botones.length} boton(es) mirados, ${candidatos.length} con rótulo de reaccionar${
+            descartados ? `: ${descartados}` : ""
+          }`,
+        };
       }
+      const boton = elegido;
 
       // Hay builds donde el rótulo no cambia al reaccionar: sigue diciendo
       // "Me gusta", solo que en azul. Clickearlo ahí quitaría la reacción en vez
@@ -805,7 +890,7 @@ async function markFacebookPostLike(page: Page): Promise<PostLikeProbe> {
 
       boton.setAttribute(likeMark, "1");
       boton.scrollIntoView({ block: "center" });
-      return { status: "ready", detail: `"${nombreDe(boton).slice(0, 60)}"` };
+      return { status: "ready", detail: `"${nombreDe(boton).slice(0, 60)}" (${comoSeEligio(puntaje)})` };
     },
     {
       likeMark: FACEBOOK_POST_LIKE_MARK,
@@ -813,6 +898,9 @@ async function markFacebookPostLike(page: Page): Promise<PostLikeProbe> {
       likePatterns: FACEBOOK_LIKE_ARIA_PATTERNS,
       unlikePatterns: FACEBOOK_UNLIKE_ARIA_PATTERNS,
       rowLabels: FACEBOOK_ACTION_ROW_LABELS,
+      shareLabels: FACEBOOK_SHARE_LABELS,
+      replyLabels: FACEBOOK_REPLY_LABELS,
+      commentArticleLabels: FACEBOOK_COMMENT_ARTICLE_LABELS,
     },
   );
 }
@@ -876,8 +964,11 @@ async function prepareFacebookLike(page: Page, ctx: StepContext) {
   // Lo mismo valía para el atajo de "ya reaccionada": el botón de quitar la
   // reacción de un comentario ajeno daba la tarea por hecha sin haber tocado la
   // publicación. El sondeo también resuelve ese caso, y con el post a la vista.
+  let ultimo: PostLikeProbe | null = null;
+
   for (let intento = 1; intento <= BUSCAR_LIKE_INTENTOS; intento += 1) {
     const probe = await markFacebookPostLike(page);
+    ultimo = probe;
 
     if (probe.status === "ready") {
       await log(ctx.taskId, "info", `Botón de reaccionar localizado por ${probe.detail}.`);
@@ -893,6 +984,16 @@ async function prepareFacebookLike(page: Page, ctx: StepContext) {
       await page.waitForTimeout(900);
     }
   }
+
+  // Ni bajando apareció. No se corta acá —el paso siguiente todavía lo intenta
+  // con el selector ancho— pero queda escrito qué se miró: sin esta línea, un
+  // like que no sale se ve en el registro como un montón de scroll y nada más,
+  // que es exactamente lo que no deja arreglarlo.
+  await log(
+    ctx.taskId,
+    "warn",
+    `No se pudo distinguir el botón de la publicación tras ${BUSCAR_LIKE_INTENTOS} intentos (${ultimo?.detail ?? "sin datos"}).`,
+  );
 }
 
 async function prepareSelectorTarget(page: Page, rawSelector: string, ctx: StepContext) {
