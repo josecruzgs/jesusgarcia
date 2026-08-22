@@ -1,7 +1,12 @@
 // Un solo color por estado: el texto, el punto, el borde y el tinte del
 // fondo salen todos del mismo valor vía color-mix, así nunca se
 // desincronizan.
-const COLORS: Record<string, string> = {
+//
+// Exportado porque no solo lo usa este badge: las tarjetas de conteo del modal
+// de campañas se tiñen del mismo color al filtrar, y ahí el punto es
+// justamente que la tarjeta activa y los badges de la tabla se lean como lo
+// mismo.
+export const STATUS_COLORS: Record<string, string> = {
   pending: "var(--text-muted)",
   queued: "var(--blue)",
   running: "var(--amber)",
@@ -23,7 +28,7 @@ const COLORS: Record<string, string> = {
   unknown: "var(--text-muted)",
 };
 
-const LABELS: Record<string, string> = {
+export const STATUS_LABELS: Record<string, string> = {
   pending: "Pendiente",
   queued: "En cola",
   running: "Corriendo",
@@ -44,7 +49,7 @@ const LABELS: Record<string, string> = {
 const LIVE = new Set(["running", "queued"]);
 
 export default function StatusBadge({ status }: { status: string }) {
-  const c = COLORS[status] ?? COLORS.unknown;
+  const c = STATUS_COLORS[status] ?? STATUS_COLORS.unknown;
 
   return (
     <span
@@ -59,7 +64,7 @@ export default function StatusBadge({ status }: { status: string }) {
         className={`h-1.5 w-1.5 shrink-0 rounded-full ${LIVE.has(status) ? "dot-live" : ""}`}
         style={{ background: c }}
       />
-      {LABELS[status] ?? status}
+      {STATUS_LABELS[status] ?? status}
     </span>
   );
 }

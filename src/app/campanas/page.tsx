@@ -14,6 +14,7 @@ import {
   Play,
   Plus,
   RefreshCw,
+  RotateCcw,
   Search,
   Share2,
   Trash2,
@@ -23,7 +24,7 @@ import { apiFetch } from "@/lib/api";
 import Card from "@/components/Card";
 import ElementIcon from "@/components/ui/ElementIcon";
 import Pagination from "@/components/Pagination";
-import StatusBadge from "@/components/StatusBadge";
+import StatusBadge, { STATUS_COLORS, STATUS_LABELS } from "@/components/StatusBadge";
 
 type Counts = {
   pending: number;
@@ -78,6 +79,25 @@ const TYPE_LABELS: Record<string, string> = {
   login: "Login",
 };
 
+/**
+ * Estados desde los que una tarea se puede volver a lanzar.
+ *
+ * `success` queda afuera a propósito: repetir un like ya dado no lo mejora, lo
+ * duplica, y no hay forma de deshacerlo. Los estados en curso —queued,
+ * running— tampoco: ya van en camino.
+ */
+const RELAUNCHABLE_STATUSES = new Set(["failed", "cancelled", "pending", "paused"]);
+
+/**
+ * "Relanzar" solo se aplica a lo que ya corrió. Una tarea pendiente o pausada
+ * nunca se ejecutó, y llamarle relanzar sugiere una segunda pasada que no
+ * existe —justo lo que uno necesita distinguir cuando está mirando por qué
+ * algo se duplicó.
+ */
+function relaunchVerb(status: string) {
+  return status === "failed" || status === "cancelled" ? "Relanzar" : "Encolar";
+}
+
 // Solo los tipos con un formulario que soporta "agregar a campaña
 // existente" (ver ExistingCampaignPicker) tienen a dónde mandar el botón.
 const TYPE_ROUTES: Record<string, string> = {
@@ -128,6 +148,11 @@ function CampaignsContent() {
   const [resumingCampaign, setResumingCampaign] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  // Estado por el que está filtrada la tabla del modal, o null para verlas
+  // todas. Vive acá y no en la URL porque muere con el modal.
+  const [taskFilter, setTaskFilter] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [retryingBulk, setRetryingBulk] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -167,6 +192,10 @@ function CampaignsContent() {
   const openCampaign = useCallback(
     async (id: string) => {
       setSelectedId(id);
+      // El filtro no se hereda de la campaña anterior: "fallidas" en una no
+      // quiere decir nada en la siguiente, y arrancar con la tabla recortada
+      // sin haberlo pedido se lee como que faltan tareas.
+      setTaskFilter(null);
       await loadCampaign(id);
     },
     [loadCampaign],
@@ -175,6 +204,7 @@ function CampaignsContent() {
   const closeCampaign = useCallback(() => {
     setSelectedId(null);
     setDetail(null);
+    setTaskFilter(null);
   }, []);
 
   useEffect(() => {
@@ -226,6 +256,14 @@ function CampaignsContent() {
   const pausedInDetail = selectedCampaign?.counts.paused ?? 0;
   const hasFilters = Boolean(search || status || type);
 
+  // La tabla del modal recortada al estado elegido. El filtro se aplica sobre
+  // lo que ya vino: el detalle trae todas las tareas de la campaña en una sola
+  // respuesta, así que no hay nada que volver a pedirle al servidor.
+  const visibleTasks = useMemo(
+    () => (taskFilter ? (detail?.tasks ?? []).filter((task) => task.status === taskFilter) : (detail?.tasks ?? [])),
+    [detail, taskFilter],
+  );
+
   const totals = useMemo(
     () =>
       campaigns.reduce(
@@ -253,6 +291,61 @@ function CampaignsContent() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setRunningPending(false);
+    }
+  }
+
+  /**
+   * Vuelve a encolar una tarea suelta. Es el mismo endpoint que usa el botón
+   * de la ficha de la tarea: pone `queued` y borra el error viejo, y el worker
+   * la recoge en su próxima vuelta.
+   */
+  async function retryTask(taskId: string) {
+    if (!selectedId) return;
+    setRetryingId(taskId);
+    setError(null);
+    try {
+      await apiFetch(`/api/tasks/${taskId}/run`, { method: "POST" });
+      // silent: la fila cambia sola de estado sin que la tabla parpadee en
+      // esqueleto, que con una sola tarea reencolada sería desproporcionado.
+      await Promise.all([load(), loadCampaign(selectedId, true)]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRetryingId(null);
+    }
+  }
+
+  /**
+   * Relanza de una todas las tareas del estado filtrado.
+   *
+   * Con 27 fallidas entre 333, hacerlo fila por fila es el tipo de tarea que
+   * uno abandona a la mitad; el botón aparece solo cuando hay un filtro puesto,
+   * así que siempre se relanza exactamente lo que está a la vista.
+   */
+  async function retryFiltered() {
+    if (!selectedId || !taskFilter) return;
+
+    const label = (STATUS_LABELS[taskFilter] ?? taskFilter).toLowerCase();
+    const ok = confirm(
+      `¿${relaunchVerb(taskFilter)} ${visibleTasks.length} ${visibleTasks.length === 1 ? "tarea" : "tareas"} en estado "${label}"?`,
+    );
+    if (!ok) return;
+
+    setRetryingBulk(true);
+    setError(null);
+    try {
+      await apiFetch(`/api/campaigns/${selectedId}/run`, {
+        method: "POST",
+        body: JSON.stringify({ status: taskFilter }),
+      });
+      await Promise.all([load(), loadCampaign(selectedId, true)]);
+      // Se sigue el movimiento en vez de dejar la tabla vacía: las tareas
+      // acaban de pasar a "en cola", y ahí es donde uno quiere mirar ahora.
+      setTaskFilter("queued");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRetryingBulk(false);
     }
   }
 
@@ -631,14 +724,81 @@ function CampaignsContent() {
                 <div className="h-48 animate-pulse-soft rounded-lg bg-page" />
               ) : detail ? (
                 <div className="flex flex-col gap-4">
+                  {/* Las tarjetas de conteo son el filtro de la tabla: es donde
+                      uno ya está mirando cuando piensa "a ver esas 27
+                      fallidas", y así no hace falta un control aparte que
+                      repita la misma lista de estados. Las que están en cero no
+                      se pueden pulsar: filtrar por ellas solo daría una tabla
+                      vacía. */}
                   <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
-                    {Object.entries(detail.campaign.counts).map(([key, value]) => (
-                      <div key={key} className="rounded-lg border border-hairline bg-page p-3">
-                        <p className="label-mono">{key}</p>
-                        <p className="mt-1 text-lg font-semibold text-ink">{value}</p>
-                      </div>
-                    ))}
+                    {Object.entries(detail.campaign.counts).map(([key, value]) => {
+                      const active = taskFilter === key;
+                      const color = STATUS_COLORS[key] ?? "var(--text-muted)";
+                      const label = STATUS_LABELS[key] ?? key;
+
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          disabled={!value}
+                          aria-pressed={active}
+                          onClick={() => setTaskFilter(active ? null : key)}
+                          title={
+                            !value
+                              ? `No hay tareas en ${label.toLowerCase()}`
+                              : active
+                                ? "Quitar el filtro y ver todas las tareas"
+                                : `Ver solo las ${value} en ${label.toLowerCase()}`
+                          }
+                          className="rounded-lg border border-hairline bg-page p-3 text-left transition-colors hover:border-ink-muted disabled:pointer-events-none disabled:opacity-40"
+                          style={
+                            active
+                              ? {
+                                  borderColor: `color-mix(in srgb, ${color} 55%, transparent)`,
+                                  background: `color-mix(in srgb, ${color} 10%, transparent)`,
+                                }
+                              : undefined
+                          }
+                        >
+                          <p className="label-mono" style={active ? { color } : undefined}>
+                            {key}
+                          </p>
+                          <p className="mt-1 text-lg font-semibold text-ink">{value}</p>
+                        </button>
+                      );
+                    })}
                   </div>
+
+                  {taskFilter && (
+                    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-hairline bg-page px-3 py-2">
+                      <p className="text-sm text-ink-secondary">
+                        Mostrando <span className="font-semibold text-ink">{visibleTasks.length}</span> de{" "}
+                        {detail.tasks.length} · {STATUS_LABELS[taskFilter] ?? taskFilter}
+                      </p>
+
+                      <div className="ml-auto flex items-center gap-2">
+                        {RELAUNCHABLE_STATUSES.has(taskFilter) && visibleTasks.length > 0 && (
+                          <button
+                            type="button"
+                            disabled={retryingBulk}
+                            onClick={retryFiltered}
+                            title="Encolar todas las tareas que estás viendo"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-1.5 text-sm font-medium text-ink-secondary transition-colors hover:text-ink disabled:pointer-events-none disabled:opacity-40"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            {retryingBulk ? "Encolando..." : `${relaunchVerb(taskFilter)} ${visibleTasks.length}`}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setTaskFilter(null)}
+                          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-ink-muted transition-colors hover:text-ink"
+                        >
+                          <X className="h-3.5 w-3.5" /> Quitar filtro
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="overflow-x-auto rounded-lg border border-hairline">
                     <table className="w-full text-sm">
@@ -650,11 +810,11 @@ function CampaignsContent() {
                           <th className="px-4 py-3 font-medium">Programada</th>
                           <th className="px-4 py-3 font-medium">Terminó</th>
                           <th className="px-4 py-3 font-medium">Error</th>
-                          <th className="px-4 py-3 font-medium">Abrir</th>
+                          <th className="px-4 py-3 font-medium">Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {detail.tasks.map((task) => (
+                        {visibleTasks.map((task) => (
                           <tr key={task._id} className="border-t border-hairline">
                             <td className="px-4 py-3">
                               <p className="font-medium text-ink">{task.profileId?.name ?? "Sin perfil"}</p>
@@ -672,16 +832,54 @@ function CampaignsContent() {
                               {task.error ? <span className="line-clamp-3">{task.error}</span> : "—"}
                             </td>
                             <td className="px-4 py-3">
-                              <Link
-                                href={`/tasks/${task._id}`}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-hairline text-ink-muted transition-colors hover:bg-page hover:text-ink"
-                                title="Abrir tarea"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Link>
+                              <div className="flex items-center gap-1.5">
+                                {/* Relanzar vive en la fila y no solo en la
+                                    ficha de la tarea: con el filtro de fallidas
+                                    puesto, el error y el botón que lo corrige
+                                    quedan a la misma altura y se puede ir
+                                    bajando de una. */}
+                                {RELAUNCHABLE_STATUSES.has(task.status) && (
+                                  <button
+                                    type="button"
+                                    disabled={retryingId === task._id}
+                                    onClick={() => retryTask(task._id)}
+                                    title={
+                                      relaunchVerb(task.status) === "Relanzar"
+                                        ? "Volver a lanzar esta tarea"
+                                        : "Encolar esta tarea ahora"
+                                    }
+                                    aria-label={
+                                      relaunchVerb(task.status) === "Relanzar"
+                                        ? "Volver a lanzar esta tarea"
+                                        : "Encolar esta tarea ahora"
+                                    }
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-hairline text-ink-muted transition-colors hover:bg-page hover:text-ink disabled:pointer-events-none disabled:opacity-40"
+                                  >
+                                    <RotateCcw
+                                      className={`h-4 w-4 ${retryingId === task._id ? "animate-spin" : ""}`}
+                                    />
+                                  </button>
+                                )}
+                                <Link
+                                  href={`/tasks/${task._id}`}
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-hairline text-ink-muted transition-colors hover:bg-page hover:text-ink"
+                                  title="Abrir tarea"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Link>
+                              </div>
                             </td>
                           </tr>
                         ))}
+                        {!visibleTasks.length && (
+                          <tr className="border-t border-hairline">
+                            <td colSpan={7} className="px-4 py-10 text-center text-sm text-ink-muted">
+                              {taskFilter
+                                ? `Ninguna tarea en ${(STATUS_LABELS[taskFilter] ?? taskFilter).toLowerCase()}.`
+                                : "Esta campaña todavía no tiene tareas."}
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
