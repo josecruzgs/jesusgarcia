@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, MessageSquare, CheckCircle2, ExternalLink, Download, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, MessageSquare, CheckCircle2, SlidersHorizontal } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { COMMENT_PRESETS as PLATFORM_PRESETS } from "@/lib/automation/socialSelectors";
 import StatusBadge from "@/components/StatusBadge";
@@ -29,10 +29,6 @@ type CreatedCampaign = {
 };
 
 type PoolComment = { _id: string; text: string };
-
-const DEFAULT_SHEET_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSbUfu9pvyPULSSFWDN7F7qxs0Y8jfZJZ5U0xoSL-QZKxItYrWjyRVdn2QhTtLoG3o65EDVerPgo4XI/pub?gid=0&single=true&output=csv";
-const DEFAULT_SHEET_EDIT_URL = "https://docs.google.com/spreadsheets/d/1Aq8kLsSuas4vWP6aQ-jgQhWHAyt_lki5-Vqup-1EkKc/edit?usp=sharing";
 
 export default function CommentCampaignPage() {
   const [profiles, setProfiles] = useState<PickerProfile[]>([]);
@@ -64,7 +60,6 @@ export default function CommentCampaignPage() {
   const [poolTotal, setPoolTotal] = useState(0);
   const [poolAvailable, setPoolAvailable] = useState(0);
   const [poolPreview, setPoolPreview] = useState<PoolComment[]>([]);
-  const [sheetUrl, setSheetUrl] = useState("");
   const [manualComments, setManualComments] = useState("");
   const [importing, setImporting] = useState(false);
   const [poolBusy, setPoolBusy] = useState(false);
@@ -121,30 +116,6 @@ export default function CommentCampaignPage() {
     setSelector(preset?.selector ?? "");
     setSubmitMethod(preset?.submitMethod ?? "enter");
     setSubmitSelector(preset?.submitSelector ?? "");
-  }
-
-  async function importSheetUrl(sourceUrl: string) {
-    if (!sourceUrl.trim()) return;
-    setImporting(true);
-    setPoolMessage(null);
-    setError(null);
-    try {
-      const data = await apiFetch<{ imported: number; skipped: number }>("/api/comments", {
-        method: "POST",
-        body: JSON.stringify({ sheetUrl: sourceUrl }),
-      });
-      setPoolMessage(`Importados ${data.imported} comentario(s) nuevos (${data.skipped} ya estaban en el banco).`);
-      await loadPool();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setImporting(false);
-    }
-  }
-
-  function importFromSheet(e: React.FormEvent) {
-    e.preventDefault();
-    importSheetUrl(sheetUrl);
   }
 
   async function importManual(e: React.FormEvent) {
@@ -330,65 +301,31 @@ export default function CommentCampaignPage() {
 
         {poolMessage && <p className="text-xs text-success">{poolMessage}</p>}
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <form onSubmit={importFromSheet} className="flex flex-col gap-2">
-            <label className="text-xs text-ink-muted">
-              Importar desde Google Sheets (Archivo → Compartir → Publicar en la web → CSV)
-            </label>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={importing}
-                onClick={() => importSheetUrl(DEFAULT_SHEET_CSV_URL)}
-                className="glow-btn inline-flex items-center gap-1.5 rounded bg-primary px-3 py-2 text-sm font-medium text-primary-fg transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50"
-              >
-                <Download className="h-4 w-4" />
-                Importar sheet por defecto
-              </button>
-              <a
-                href={DEFAULT_SHEET_EDIT_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-hairline px-3 py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-page hover:text-ink"
-              >
-                <ExternalLink className="h-4 w-4" />
-                Editar comentarios en Sheets
-              </a>
-            </div>
-            <div className="flex gap-2">
-              <input
-                value={sheetUrl}
-                onChange={(e) => setSheetUrl(e.target.value)}
-                placeholder="O pega otro link (https://docs.google.com/spreadsheets/d/.../pub?output=csv)"
-                className="flex-1 rounded-lg border border-hairline bg-page px-3 py-2 text-sm outline-none transition-colors focus:border-primary"
-              />
-              <button
-                disabled={importing || !sheetUrl.trim()}
-                className="rounded-lg border border-hairline px-3 py-2 text-sm font-medium transition-colors hover:bg-page disabled:opacity-50"
-              >
-                {importing ? "..." : "Importar"}
-              </button>
-            </div>
-            <p className="text-xs text-ink-muted">Toma la primera columna de cada fila como texto del comentario.</p>
-          </form>
-
-          <form onSubmit={importManual} className="flex flex-col gap-2">
-            <label className="text-xs text-ink-muted">O pega comentarios a mano (uno por línea)</label>
-            <textarea
-              value={manualComments}
-              onChange={(e) => setManualComments(e.target.value)}
-              rows={2}
-              placeholder={"Qué buena publicación!\nMe encantó esto 🙌"}
-              className="rounded-lg border border-hairline bg-page px-3 py-2 text-sm outline-none transition-colors focus:border-primary"
-            />
+        {/* Esta caja compartía la fila con una importación desde Google Sheets
+            (un link publicado como CSV, más un botón al sheet de la casa). Se
+            quitó a pedido: el banco se llena solo escribiendo acá, una línea
+            por comentario, y por eso la caja ahora ocupa el ancho entero. */}
+        <form onSubmit={importManual} className="flex flex-col gap-2">
+          <label className="text-xs text-ink-muted">Agregar comentarios (uno por línea)</label>
+          <textarea
+            value={manualComments}
+            onChange={(e) => setManualComments(e.target.value)}
+            rows={6}
+            placeholder={"Qué buena publicación!\nMe encantó esto 🙌\nVamos con todo 💪"}
+            className="rounded-lg border border-hairline bg-page px-3 py-2 text-sm outline-none transition-colors focus:border-primary"
+          />
+          <div className="flex flex-wrap items-center gap-3">
             <button
               disabled={importing || !manualComments.trim()}
               className="w-fit rounded-lg border border-hairline px-3 py-2 text-sm font-medium transition-colors hover:bg-page disabled:opacity-50"
             >
               {importing ? "..." : "Agregar al banco"}
             </button>
-          </form>
-        </div>
+            <span className="text-xs text-ink-muted">
+              Las líneas vacías se ignoran y los textos repetidos no se duplican.
+            </span>
+          </div>
+        </form>
 
         {poolPreview.length > 0 && (
           <div className="flex flex-col gap-1 border-t border-hairline pt-3">

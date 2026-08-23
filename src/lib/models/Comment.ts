@@ -7,7 +7,6 @@ const CommentSchema = new Schema(
   {
     ownerId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     text: { type: String, required: true },
-    source: { type: String, default: "manual" }, // "manual" o la URL del Sheet importado
     used: { type: Boolean, default: false },
     usedAt: { type: Date },
     usedByTaskId: { type: Schema.Types.ObjectId, ref: "Task" },

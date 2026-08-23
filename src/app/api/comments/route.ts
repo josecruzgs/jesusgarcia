@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/mongodb";
 import CommentModel from "@/lib/models/Comment";
-import { parseCsv } from "@/lib/csv";
 import { withAuth } from "@/lib/apiHandler";
 
 // Cada usuario tiene su propio banco: la marca "used" es por dueño, así que un
@@ -31,46 +30,22 @@ export const GET = withAuth(async (user, req: NextRequest) => {
   return NextResponse.json({ comments, total, available, used: total - available });
 });
 
-// Importa comentarios desde un Sheet publicado como CSV ("Archivo > Compartir
-// > Publicar en la web" en Google Sheets, formato CSV) o desde una lista
-// pegada a mano. Se toma la primera columna de cada fila como el texto.
+// Agrega comentarios al banco desde una lista escrita a mano: un texto por
+// línea, que el cliente manda ya partido en `comments`.
+//
+// Acá vivía además una importación desde un Google Sheet publicado como CSV.
+// Se quitó a pedido: el banco se llena solo desde la caja de texto. Si alguna
+// vez hiciera falta volver a traer textos de afuera, esto recibe un arreglo de
+// cadenas y lo demás (deduplicar, contar) ya funciona igual sea cual sea el
+// origen — lo único que habría que reponer es de dónde sale el arreglo.
 export const POST = withAuth(async (user, req: NextRequest) => {
   const body = await req.json();
   await dbConnect();
   const mine = { ownerId: user.objectId };
 
-  let texts: string[] = [];
-  let source = "manual";
-
-  if (typeof body.sheetUrl === "string" && body.sheetUrl.trim()) {
-    source = body.sheetUrl.trim();
-    const res = await fetch(source);
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: `No se pudo leer el Sheet (HTTP ${res.status}). ¿Está publicado como CSV?` },
-        { status: 400 },
-      );
-    }
-    const csv = await res.text();
-    // El link de "Publicar en la web" puede quedar en formato "Página web"
-    // (HTML) en vez de "Valores separados por comas (.csv)" si no se cambió
-    // el desplegable de formato. Si eso pasa, cada línea del HTML se
-    // importaría como un "comentario" — se detecta y se rechaza antes.
-    if (/^\s*<(!doctype html|html)/i.test(csv)) {
-      return NextResponse.json(
-        {
-          error:
-            "El link devolvió HTML, no CSV. En 'Publicar en la web' cambia el desplegable de formato a 'Valores separados por comas (.csv)' antes de copiar el link (debe terminar en algo como '/pub?output=csv').",
-        },
-        { status: 400 },
-      );
-    }
-    texts = parseCsv(csv)
-      .map((row) => (row[0] ?? "").trim())
-      .filter(Boolean);
-  } else if (Array.isArray(body.comments)) {
-    texts = body.comments.map((t: unknown) => String(t).trim()).filter(Boolean);
-  }
+  const texts: string[] = Array.isArray(body.comments)
+    ? body.comments.map((t: unknown) => String(t).trim()).filter(Boolean)
+    : [];
 
   if (texts.length === 0) {
     return NextResponse.json({ error: "No se encontraron comentarios para importar" }, { status: 400 });
@@ -84,7 +59,7 @@ export const POST = withAuth(async (user, req: NextRequest) => {
   const fresh = texts.filter((t) => !existing.has(t));
 
   if (fresh.length > 0) {
-    await CommentModel.insertMany(fresh.map((text) => ({ ...mine, text, source })));
+    await CommentModel.insertMany(fresh.map((text) => ({ ...mine, text })));
   }
 
   const [total, available] = await Promise.all([
