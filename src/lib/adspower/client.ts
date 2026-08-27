@@ -184,9 +184,26 @@ export const adsPower = {
     });
   },
 
+  /**
+   * Abre el navegador del perfil con una sola pestaña en blanco.
+   *
+   * Por defecto AdsPower restaura "la plataforma o la página histórica", que
+   * en un perfil con meses de uso son todas las pestañas de las tareas
+   * anteriores: cada una es una carga de Facebook completa, con el proxy
+   * residencial de por medio, antes de que la tarea pueda hacer nada. Y encima
+   * abre su propia pestaña de comprobación de IP, que también cuesta.
+   *
+   * `open_tabs: 1` es "Close" —el flag está al revés de lo que sugiere el
+   * nombre, dice si abrir la histórica— y `ip_tab: 0` es no abrir la de la IP.
+   * Ver https://localapi-doc-en.adspower.com/docs/FFMFMf.
+   *
+   * Ojo: esto solo aplica cuando el navegador arranca. Si ya estaba abierto,
+   * AdsPower devuelve la instancia que hay y las pestañas viejas siguen ahí;
+   * de eso se ocupa connectToProfile.
+   */
   async startBrowser(profileId: string) {
     return request<AdsPowerStartBrowserData>("/api/v1/browser/start", {
-      query: { user_id: profileId, headless: 0 },
+      query: { user_id: profileId, headless: 0, open_tabs: 1, ip_tab: 0 },
     });
   },
 
