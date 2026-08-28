@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/mongodb";
 import ProfileModel from "@/lib/models/Profile";
+import TaskModel from "@/lib/models/Task";
 import { adsPower } from "@/lib/adspower/client";
 import { withAuth } from "@/lib/apiHandler";
 import { allowedGroupFilter } from "@/lib/auth/dal";
@@ -49,8 +50,25 @@ export const GET = withAuth(async (user, req: NextRequest) => {
   }
 
   if (all) {
-    const profiles = await ProfileModel.find(filter).sort({ name: 1 });
-    return NextResponse.json({ profiles });
+    const profiles = await ProfileModel.find(filter).sort({ name: 1 }).lean();
+
+    // Cuántas tareas lleva encima cada perfil, para que el selector de
+    // candidatos pueda poner arriba a los menos usados y las campañas dejen de
+    // recaer siempre en los mismos.
+    //
+    // Se cuentan las canceladas aparte —es decir, no se cuentan—: nunca llegaron
+    // a ejecutarse, así que no gastaron el perfil. Las que están en cola sí
+    // suman: ya están comprometidas, y no contarlas haría que dos campañas
+    // creadas seguidas eligieran a los mismos.
+    const uso: { _id: unknown; n: number }[] = await TaskModel.aggregate([
+      { $match: { profileId: { $in: profiles.map((p) => p._id) }, status: { $ne: "cancelled" } } },
+      { $group: { _id: "$profileId", n: { $sum: 1 } } },
+    ]);
+    const porPerfil = new Map(uso.map((u) => [String(u._id), u.n]));
+
+    return NextResponse.json({
+      profiles: profiles.map((p) => ({ ...p, taskCount: porPerfil.get(String(p._id)) ?? 0 })),
+    });
   }
 
   const [profiles, total] = await Promise.all([

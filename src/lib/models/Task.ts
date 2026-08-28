@@ -100,6 +100,10 @@ const TaskSchema = new Schema(
 // toma de la cola sin importar de quién sea la tarea (src/worker/index.ts).
 TaskSchema.index({ status: 1, scheduledAt: 1 });
 TaskSchema.index({ campaignId: 1, status: 1 });
+// Cuántas tareas lleva cada perfil: lo pregunta el selector de candidatos en
+// cada campaña nueva, para poner arriba a los menos usados (ver
+// src/app/api/profiles/route.ts).
+TaskSchema.index({ profileId: 1 });
 // Y este es el del panel, que sí arranca siempre por dueño.
 TaskSchema.index({ ownerId: 1, status: 1, scheduledAt: 1 });
 
