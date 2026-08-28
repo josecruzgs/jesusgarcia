@@ -14,9 +14,31 @@ export async function connectToProfile(profileId: string): Promise<{ browser: Br
   const browser = await chromium.connectOverCDP(ws.puppeteer);
 
   const context = browser.contexts()[0] ?? (await browser.newContext());
+  await concederNotificaciones(context);
   const page = await dejarUnaSolaPestaña(context);
 
   return { browser, page };
+}
+
+/**
+ * Da por respondido el "www.facebook.com quiere mostrar notificaciones".
+ *
+ * Ese cartel es del navegador, no de la página: vive fuera del DOM, así que
+ * Playwright no lo ve ni lo puede cerrar, y en un perfil recién abierto —que
+ * nunca contestó— aparece encima de la publicación en cuanto carga Facebook.
+ * Hasta ahora había que ir al visor y darle "Allow" a mano, perfil por perfil.
+ *
+ * Esto contesta lo mismo que contestaba la mano, pero por CDP y antes de
+ * navegar: Chrome guarda el permiso como concedido y ya no vuelve a preguntar.
+ * Se concede para todos los orígenes y no solo para Facebook porque las tareas
+ * también entran a Instagram, y Facebook además pregunta desde varios dominios
+ * (www., web., m.); enumerarlos era garantizarse olvidar uno.
+ *
+ * Nunca tira: que un perfil se quede sin el permiso es un cartel de más en la
+ * pantalla, no un motivo para tumbar la tarea.
+ */
+async function concederNotificaciones(context: BrowserContext) {
+  await context.grantPermissions(["notifications"]).catch(() => {});
 }
 
 /**

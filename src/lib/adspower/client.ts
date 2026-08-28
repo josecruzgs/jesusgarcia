@@ -17,6 +17,26 @@ import type {
 const DEFAULT_MIN_REQUEST_INTERVAL_MS = 1100;
 const RATE_LIMIT_RETRY_DELAYS_MS = [1200, 2200, 3500];
 
+/**
+ * Banderas que se le pasan al Chromium del perfil cuando arranca.
+ *
+ * La barra de Google Translate ("¿Traducir esta página? Spanish | English") es
+ * UI nativa del navegador, no DOM: Playwright no la ve y no la puede cerrar, y
+ * si alguien alguna vez le dijo "traducir siempre" a ese perfil, Chrome reescribe
+ * los rótulos de Facebook y todos los selectores por texto pasan a dar
+ * "0 match(es)". Apagar la función de raíz es la única forma de que no aparezca.
+ *
+ * Van los dos nombres a propósito: `TranslateUI` es como se llamaba la feature
+ * en los Chromium viejos —AdsPower arrastra varias versiones según el perfil— y
+ * `Translate` como se llama ahora.
+ *
+ * Ojo con agregar más: `--disable-features` es un switch de valor único, así que
+ * si AdsPower pasara el suyo, el último gana y se pisan. Y nada que toque la
+ * huella (idioma, user agent, APIs deshabilitadas): el sentido de AdsPower es
+ * que cada perfil parezca un navegador normal.
+ */
+const LAUNCH_ARGS = ["--disable-features=Translate,TranslateUI"];
+
 let requestQueue = Promise.resolve();
 let lastRequestStartedAt = 0;
 
@@ -203,7 +223,19 @@ export const adsPower = {
    */
   async startBrowser(profileId: string) {
     return request<AdsPowerStartBrowserData>("/api/v1/browser/start", {
-      query: { user_id: profileId, headless: 0, open_tabs: 1, ip_tab: 0 },
+      query: {
+        user_id: profileId,
+        headless: 0,
+        open_tabs: 1,
+        ip_tab: 0,
+        // Vaciar la caché al cerrar no es una optimización: sin esto cada tarea
+        // deja en disco el video del reel que miró, para un perfil que quizá no
+        // se vuelve a usar en un mes. En godeye eso acumuló 79 GB en tres
+        // semanas y dejó al VPS sin espacio para desplegar.
+        clear_cache_after_closing: 1,
+        // La Local API espera el array serializado como JSON dentro del query.
+        launch_args: JSON.stringify(LAUNCH_ARGS),
+      },
     });
   },
 
