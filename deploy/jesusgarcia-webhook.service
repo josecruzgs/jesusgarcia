@@ -1,0 +1,32 @@
+# → /etc/systemd/system/jesusgarcia-webhook.service
+#
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now jesusgarcia-webhook
+#   journalctl -u jesusgarcia-webhook -f
+#
+# El secreto va en /etc/jesusgarcia-webhook.env (root:root, chmod 600), no acá:
+# los archivos de unidad son legibles por cualquiera del sistema.
+#
+#   GODEYE_WEBHOOK_SECRET=...
+#
+[Unit]
+Description=Receptor del webhook de GitHub para desplegar jesusgarcia
+After=network.target
+
+[Service]
+Type=simple
+User=burgueno
+WorkingDirectory=/home/burgueno/jesusgarcia
+EnvironmentFile=/etc/jesusgarcia-webhook.env
+Environment=GODEYE_REPO_DIR=/home/burgueno/jesusgarcia
+Environment=GODEYE_DEPLOY_BRANCH=main
+Environment=GODEYE_WEBHOOK_PORT=9098
+# PM2, node y npm los instaló nvm o nodesource; systemd arranca con un PATH
+# mínimo que no los incluye.
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/burgueno/.npm-global/bin
+ExecStart=/usr/bin/node /home/burgueno/jesusgarcia/deploy/webhook.mjs
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

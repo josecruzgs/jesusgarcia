@@ -471,6 +471,97 @@ cd ~/jesusgarcia && git pull && npm ci && npm run build && pm2 reload all
 `pm2 reload` en vez de `restart`: espera a que terminen las peticiones en vuelo
 en vez de cortarlas.
 
+Lo mismo, hecho script y con los cuidados que a mano se olvidan —candado para
+que no corran dos a la vez, chequeo de disco antes de tocar `node_modules`,
+`npm ci` solo si cambiaron las dependencias y no reiniciar nada si el build
+falla— es `deploy/update.sh`:
+
+```bash
+bash ~/jesusgarcia/deploy/update.sh            # solo si hay commits nuevos
+bash ~/jesusgarcia/deploy/update.sh --force    # compila y recarga igual
+```
+
+El `--force` es para rehacer un build que quedó a medias: sin él, el script
+compara commits, ve que el repo ya está en el del remoto y sale sin hacer nada.
+
+### Deploy automático con un webhook de GitHub
+
+Con esto, cada push a `main` actualiza el VPS solo. Son tres piezas: un
+receptor que escucha en el localhost (`deploy/webhook.mjs`), nginx que le
+acerca una ruta pública, y el webhook dado de alta en GitHub.
+
+**Qué se despliega y qué no.** Solo los push a `main`; cualquier otra rama se
+contesta con un 200 y no pasa nada. Si llegan tres push seguidos no se
+encolan tres builds: el que está corriendo termina y después se vuelve a mirar
+el remoto una sola vez, con el último commit de los tres.
+
+**El punto a tener presente:** el deploy termina recargando los procesos de PM2
+de este repo, y para los workers eso es un reinicio —una tarea de automatización en curso se corta y hay
+que recuperarla. Un push a `main` a media campaña ya no es solo un commit. Si
+esto molesta, la alternativa es trabajar en una rama y hacer merge a `main`
+cuando la cola esté vacía.
+
+En el VPS, como `burgueno`:
+
+```bash
+# Un secreto largo al azar; se usa dos veces: acá y en el formulario de GitHub.
+openssl rand -hex 32
+```
+
+Como `root`, con ese valor:
+
+```bash
+echo 'GODEYE_WEBHOOK_SECRET=EL_SECRETO_QUE_SALIÓ_ARRIBA' > /etc/jesusgarcia-webhook.env
+chmod 600 /etc/jesusgarcia-webhook.env
+
+cp /home/burgueno/jesusgarcia/deploy/jesusgarcia-webhook.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now jesusgarcia-webhook
+systemctl status jesusgarcia-webhook --no-pager
+
+cp /home/burgueno/jesusgarcia/deploy/webhook-location.conf /etc/nginx/snippets/jesusgarcia-webhook.conf
+```
+
+El `include snippets/jesusgarcia-webhook.conf;` va dentro del server block de 443,
+al lado del de la pantalla. Después, `nginx -t && systemctl reload nginx`.
+
+Es un servicio de systemd y no una app de PM2 porque el deploy termina
+recargando PM2: dentro de PM2, el receptor se reiniciaría a sí mismo y mataría
+su propio build a la mitad. Como vive afuera, un cambio en `deploy/webhook.mjs`
+no lo levanta el propio deploy: hay que reiniciarlo a mano con
+`sudo systemctl restart jesusgarcia-webhook`. Lo de `deploy/update.sh` sí toma
+efecto solo, porque se lee en cada corrida.
+
+**Ojo, en esta máquina viven dos sistemas.** `burgueno` y `jesusgarcia`
+comparten VPS y usuario, así que cada uno lleva lo suyo y nada se pisa: el
+receptor en un puerto distinto (9098), su unidad de systemd, su archivo de
+secreto, su log (`~/jesusgarcia-deploy.log`) y su candado. Y el deploy recarga solo
+los procesos del `ecosystem.config.cjs` de este repo: un `pm2 reload all` se
+llevaría puesta también la app del vecino, porque PM2 es por usuario.
+
+En GitHub → Settings → Webhooks → Add webhook:
+
+| Campo | Valor |
+|---|---|
+| Payload URL | `https://jesusgarcia.kognitic.io/_deploy/github` |
+| Content type | `application/json` |
+| Secret | el mismo de `/etc/jesusgarcia-webhook.env` |
+| Events | Just the push event |
+
+GitHub manda un `ping` al guardarlo; en Recent Deliveries tiene que figurar con
+un `200 pong`. El resto se sigue así:
+
+```bash
+journalctl -u jesusgarcia-webhook -f    # quién llamó y qué se hizo con eso
+tail -f ~/jesusgarcia-deploy.log        # la salida del build, igual que a mano
+```
+
+Un `401 firma inválida` en Recent Deliveries es el secreto distinto entre los
+dos lados. Si el build falla, el log lo dice y **no** se reinicia nada: la
+versión anterior sigue en pie y abajo del error queda escrito el comando para
+volver atrás.
+
+
 ## Mantenimiento
 
 ```bash
