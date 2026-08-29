@@ -9,6 +9,38 @@ import "@/lib/models/Profile";
 import { makeCampaignSummary, type TaskStatusCounts } from "@/lib/campaigns";
 import { withAuth } from "@/lib/apiHandler";
 
+/**
+ * Los tipos de campaña que trabajan sobre una publicación concreta.
+ *
+ * En estas, el primer paso "goto" de cada tarea es el posteo, y es el mismo
+ * para todas: la campaña se arma eligiendo perfiles para una URL. Warmup y
+ * publicaciones también empiezan con un "goto", pero al muro o al grupo, así
+ * que llamarle "la publicación de la campaña" sería mentir.
+ */
+const CAMPAIGN_TYPES_WITH_POST = new Set(["like", "likecomment", "comment", "ramificacion"]);
+
+/**
+ * La publicación sobre la que trabaja la campaña, sacada de la primera tarea.
+ *
+ * Se mira una sola tarea y no todas por dos motivos: los `steps` son lo más
+ * pesado de una tarea y traerlos de las 300 para leer un campo no se paga, y
+ * en las ramificaciones las tareas hijas terminan apuntando al comentario del
+ * padre —no al posteo—, así que la primera es justamente la que conserva la
+ * URL original.
+ */
+async function findCampaignPostUrl(campaignId: string, type: string) {
+  if (!CAMPAIGN_TYPES_WITH_POST.has(type)) return null;
+
+  // `lean()` sobre una proyección devuelve los steps sin tipar; solo se leen
+  // estos dos campos.
+  const first = await TaskModel.findOne({ campaignId })
+    .sort({ scheduledAt: 1, createdAt: 1 })
+    .select("steps")
+    .lean<{ steps?: { action?: string; url?: string }[] } | null>();
+
+  return first?.steps?.find((step) => step.action === "goto" && step.url)?.url ?? null;
+}
+
 export const GET = withAuth(
   async (user, _req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
     const { id } = await params;
@@ -32,6 +64,7 @@ export const GET = withAuth(
 
     return NextResponse.json({
       campaign: makeCampaignSummary({ campaign, counts }),
+      postUrl: await findCampaignPostUrl(id, campaign.type),
       tasks,
     });
   },

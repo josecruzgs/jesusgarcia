@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import {
   Activity,
   Eye,
+  ExternalLink,
   Heart,
   Megaphone,
   MessageSquare,
@@ -18,9 +19,11 @@ import {
   Search,
   Share2,
   Trash2,
+  UserX,
   X,
 } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
+import { useSession } from "@/lib/session";
 import Card from "@/components/Card";
 import ElementIcon from "@/components/ui/ElementIcon";
 import Pagination from "@/components/Pagination";
@@ -61,7 +64,16 @@ type CampaignTask = {
 
 type CampaignDetail = {
   campaign: Campaign;
+  /** La publicación sobre la que trabaja la campaña, cuando el tipo tiene una. */
+  postUrl?: string | null;
   tasks: CampaignTask[];
+};
+
+type DeleteProfileResult = {
+  ok: boolean;
+  adsPowerDeleted: boolean;
+  localOnly: boolean;
+  deletedTaskCount: number;
 };
 
 const PAGE_SIZE = 20;
@@ -98,6 +110,18 @@ function relaunchVerb(status: string) {
   return status === "failed" || status === "cancelled" ? "Relanzar" : "Encolar";
 }
 
+/**
+ * Si la tarea falló porque Facebook frenó la cuenta.
+ *
+ * El texto lo escribe `knownFacebookBlocker` en el runner y es el mismo para
+ * los cuatro frenos que sabe reconocer (bloqueo, checkpoint, sesión caída,
+ * revisión de seguridad). Se busca por `includes` y no por prefijo porque hay
+ * pasos que envuelven el mensaje antes de guardarlo.
+ */
+function frenadoPorFacebook(task: CampaignTask) {
+  return Boolean(task.error?.includes("Facebook detuvo este perfil"));
+}
+
 // Solo los tipos con un formulario que soporta "agregar a campaña
 // existente" (ver ExistingCampaignPicker) tienen a dónde mandar el botón.
 const TYPE_ROUTES: Record<string, string> = {
@@ -129,6 +153,11 @@ function progressFor(campaign: Campaign) {
 
 function CampaignsContent() {
   const searchParams = useSearchParams();
+  const session = useSession();
+  // Eliminar un perfil es definitivo y se lleva puestas tareas de campañas que
+  // el operador no está mirando; queda del lado de quien administra el parque
+  // de perfiles.
+  const esAdmin = session?.role === "admin";
   const campaignIdParam = searchParams.get("campaignId");
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -153,6 +182,11 @@ function CampaignsContent() {
   const [taskFilter, setTaskFilter] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [retryingBulk, setRetryingBulk] = useState(false);
+  const [deletingProfileId, setDeletingProfileId] = useState<string | null>(null);
+  // Lo que salió bien. Va aparte de `error` porque eliminar un perfil borra
+  // tareas de otras campañas: decir cuántas fueron es la única forma de que se
+  // vea lo que pasó fuera de la tabla que se está mirando.
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -196,6 +230,7 @@ function CampaignsContent() {
       // quiere decir nada en la siguiente, y arrancar con la tabla recortada
       // sin haberlo pedido se lee como que faltan tareas.
       setTaskFilter(null);
+      setNotice(null);
       await loadCampaign(id);
     },
     [loadCampaign],
@@ -205,6 +240,7 @@ function CampaignsContent() {
     setSelectedId(null);
     setDetail(null);
     setTaskFilter(null);
+    setNotice(null);
   }, []);
 
   useEffect(() => {
@@ -346,6 +382,76 @@ function CampaignsContent() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setRetryingBulk(false);
+    }
+  }
+
+  /**
+   * Retira del sistema el perfil que Facebook frenó.
+   *
+   * Vive en la fila de la tarea porque es ahí donde uno se entera: el error de
+   * la campaña dice que la cuenta quedó en revisión, y el perfil no va a
+   * volver a servir hasta que alguien entre a Facebook a mano. Borra primero
+   * las tareas que ya no se van a poder cumplir —si no, el worker seguiría
+   * sacándolas de la cola para fallarlas de a una— y después el perfil, de
+   * acá y de AdsPower, para que la próxima sincronización no lo traiga de
+   * vuelta.
+   */
+  async function deleteBlockedProfile(task: CampaignTask) {
+    const profile = task.profileId;
+    if (!profile || !selectedId) return;
+
+    const ok = confirm(
+      `¿Eliminar el perfil "${profile.name}"?
+
+Se borran sus tareas fallidas, en cola, pendientes y pausadas de TODAS las campañas, y el perfil sale de esta app y de AdsPower.
+
+Las tareas que ya se cumplieron quedan como registro.`,
+    );
+    if (!ok) return;
+
+    setDeletingProfileId(profile._id);
+    setError(null);
+    setNotice(null);
+    try {
+      let result: DeleteProfileResult;
+      try {
+        result = await apiFetch<DeleteProfileResult>(`/api/profiles/${profile._id}?withTasks=true`, {
+          method: "DELETE",
+        });
+      } catch (e) {
+        // AdsPower se niega a borrar un perfil que sigue abierto. Es el mismo
+        // camino de salida que ofrece la pantalla de perfiles: sacarlo solo de
+        // acá, avisando que la sincronización puede devolverlo.
+        if (!(e instanceof ApiError) || e.status !== 409 || !e.data.canDeleteLocal) throw e;
+
+        const soloLocal = confirm(
+          `${e.message}
+
+¿Eliminarlo solo de esta app? Si sigue existiendo en AdsPower, la próxima sincronización lo trae de vuelta.`,
+        );
+        if (!soloLocal) throw e;
+
+        const local = await apiFetch<DeleteProfileResult>(
+          `/api/profiles/${profile._id}?withTasks=true&localOnly=true`,
+          { method: "DELETE" },
+        );
+        // Las tareas se borraron en el primer intento, que es el que las contó.
+        result = {
+          ...local,
+          deletedTaskCount: Number(e.data.deletedTaskCount ?? 0) + (local.deletedTaskCount ?? 0),
+        };
+      }
+
+      const tareas = result.deletedTaskCount;
+      setNotice(
+        `Perfil "${profile.name}" eliminado ${result.adsPowerDeleted ? "de esta app y de AdsPower" : "solo de esta app"}. ` +
+          `${tareas} ${tareas === 1 ? "tarea pendiente borrada" : "tareas pendientes borradas"}.`,
+      );
+      await Promise.all([load(), loadCampaign(selectedId, true)]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDeletingProfileId(null);
     }
   }
 
@@ -659,6 +765,22 @@ function CampaignsContent() {
                     {TYPE_LABELS[selectedCampaign.type] ?? selectedCampaign.type} · {selectedCampaign.taskCount} perfiles
                   </p>
                 )}
+                {/* Una sola vez acá arriba y no en cada fila: las tareas de la
+                    campaña son el mismo posteo repartido entre perfiles, así
+                    que 300 enlaces idénticos serían 300 formas de abrir la
+                    misma pestaña. */}
+                {detail?.postUrl && (
+                  <a
+                    href={detail.postUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={detail.postUrl}
+                    className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-hairline bg-page px-2.5 py-1.5 text-xs font-medium text-ink-secondary transition-colors hover:text-ink"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">Ver publicación</span>
+                  </a>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 {selectedCampaign && TYPE_ROUTES[selectedCampaign.type] && (
@@ -720,6 +842,10 @@ function CampaignsContent() {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+              {/* El aviso se repite acá dentro: el del pie de la página queda
+                  detrás del overlay y con el modal abierto no se ve nada. */}
+              {notice && <p className="mb-4 rounded-lg bg-success/10 p-3 text-sm text-success">{notice}</p>}
+              {error && <p className="mb-4 rounded-lg bg-critical/10 p-3 text-sm text-critical">{error}</p>}
               {detailLoading && !detail ? (
                 <div className="h-48 animate-pulse-soft rounded-lg bg-page" />
               ) : detail ? (
@@ -867,6 +993,22 @@ function CampaignsContent() {
                                 >
                                   <Eye className="h-4 w-4" />
                                 </Link>
+                                {/* Solo cuando el error es el freno de
+                                    Facebook: un perfil se elimina una vez y no
+                                    hay vuelta atrás, así que el botón no se
+                                    ofrece al lado de cualquier fallo pasajero. */}
+                                {esAdmin && frenadoPorFacebook(task) && task.profileId && (
+                                  <button
+                                    type="button"
+                                    disabled={deletingProfileId === task.profileId._id}
+                                    onClick={() => deleteBlockedProfile(task)}
+                                    title="Facebook frenó este perfil: eliminarlo del sistema y de AdsPower, con sus tareas en cola"
+                                    aria-label="Eliminar este perfil del sistema"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-critical/30 text-critical transition-colors hover:bg-critical/10 disabled:pointer-events-none disabled:opacity-40"
+                                  >
+                                    <UserX className="h-4 w-4" />
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
