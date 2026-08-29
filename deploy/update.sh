@@ -106,8 +106,21 @@ else
   step "dependencias sin cambios, salteo npm ci"
 fi
 
+# Un build de Next pasa del giga de memoria. Donde conviven dos de estos
+# sistemas bajo el mismo usuario, dos builds a la vez se quedan sin RAM y mueren
+# los dos; este candado —aparte del de cada repo, que solo evita dos deploys del
+# mismo— los pone en fila. La espera es larga a propósito: encolar un build es
+# mejor que perderlo.
+build() {
+  if command -v flock >/dev/null 2>&1; then
+    flock -w 1800 "$HOME/.deploy-build.lock" npm run build
+  else
+    npm run build
+  fi
+}
+
 step "npm run build"
-if ! npm run build; then
+if ! build; then
   echo "!! el build falló. Los procesos siguen corriendo con el build anterior en memoria,"
   echo "!! pero .next quedó a medias: NO reinicies PM2 hasta arreglarlo."
   echo "!! Para volver atrás:  cd $REPO && git reset --hard $before && bash deploy/update.sh --force"
