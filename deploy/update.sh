@@ -26,10 +26,26 @@ MIN_FREE_MB="${GODEYE_MIN_FREE_MB:-3000}"
 # --force: compila y recarga aunque el repo ya esté en el commit del remoto.
 # Sirve para rehacer un build que quedó a medias, donde la comparación de
 # commits diría "no hay nada que hacer".
+#
+# --quiet: no dice nada mientras no haya trabajo. Es para correrlo por cron cada
+# minuto —donde no hay webhook que avise— sin que el log quede en tres líneas
+# por minuto diciendo que no pasó nada. Los errores se imprimen igual.
 FORCE=0
-[ "${1:-}" = "--force" ] && FORCE=1
+QUIET=0
+for arg in "$@"; do
+  case "$arg" in
+    --force) FORCE=1 ;;
+    --quiet) QUIET=1 ;;
+  esac
+done
 
 cd "$REPO" || exit 1
+
+say() { [ "$QUIET" = "1" ] || echo "$*"; }
+step() { say "-- $(date -Is) $*"; }
+# Un fallo se dice siempre, aunque sea en silencio: es lo único que uno busca
+# en el log de una corrida automática.
+fail() { echo "!! $(date -Is) $*"; exit 1; }
 
 # Un solo deploy a la vez, aunque el webhook y una mano lo lancen juntos. El
 # candado lleva el nombre del repo: donde conviven dos de estos sistemas bajo el
@@ -38,30 +54,35 @@ cd "$REPO" || exit 1
 if command -v flock >/dev/null 2>&1; then
   exec 9>"$HOME/.$(basename "$REPO")-deploy.lock"
   if ! flock -n 9; then
-    echo "== $(date -Is) ya hay un deploy corriendo; salgo"
+    say "== $(date -Is) ya hay un deploy corriendo; salgo"
     exit 0
   fi
 else
   # Sin flock no hay forma de tomar el candado, pero tampoco es motivo para no
   # desplegar: se avisa y se sigue. En Ubuntu viene con util-linux, así que
   # esto solo pasa corriendo el script fuera del servidor.
-  echo "== $(date -Is) sin flock en esta máquina: se sigue sin candado"
+  say "== $(date -Is) sin flock en esta máquina: se sigue sin candado"
 fi
 
-step() { echo "-- $(date -Is) $*"; }
-fail() { echo "!! $(date -Is) $*"; exit 1; }
-
-echo "== $(date -Is) deploy en $REPO ($BRANCH)"
+say "== $(date -Is) deploy en $REPO ($BRANCH)"
 
 before=$(git rev-parse HEAD) || fail "no pude leer HEAD"
 
 step "git fetch"
-git fetch --prune origin "$BRANCH" || fail "fetch falló"
+# -q: sin esto imprime "From ... -> FETCH_HEAD" por stderr en cada corrida, y
+# por cron eso es una línea por minuto contando que no pasó nada.
+git fetch -q --prune origin "$BRANCH" || fail "fetch falló"
 target=$(git rev-parse "origin/$BRANCH") || fail "no existe origin/$BRANCH"
 
 if [ "$before" = "$target" ] && [ "$FORCE" = "0" ]; then
-  echo "== ya estaba en ${target:0:7}, nada que hacer"
+  say "== ya estaba en ${target:0:7}, nada que hacer"
   exit 0
+fi
+
+# Hay trabajo: de acá en adelante se cuenta todo, incluso en modo silencioso.
+if [ "$QUIET" = "1" ]; then
+  QUIET=0
+  echo "== $(date -Is) deploy en $REPO ($BRANCH)"
 fi
 
 free_mb=$(df -Pm / | awk 'NR==2 {print $4}')
