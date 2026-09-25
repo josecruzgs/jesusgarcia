@@ -456,6 +456,7 @@ export default function PublicacionesPage({ params }: { params: Promise<{ id: st
               loading={profilesLoading}
               selected={selected}
               onChange={setSelected}
+              pickLeastUsed
             />
 
             <div className="grid gap-3 sm:grid-cols-2">

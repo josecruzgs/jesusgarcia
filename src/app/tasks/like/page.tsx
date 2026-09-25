@@ -290,7 +290,7 @@ export default function LikeCampaignPage() {
         )}
 
         <div className="border-t border-hairline pt-4">
-          <ProfilePicker profiles={profiles} groups={groups} loading={loading} selected={selected} onChange={setSelected} />
+          <ProfilePicker profiles={profiles} groups={groups} loading={loading} selected={selected} onChange={setSelected} pickLeastUsed />
         </div>
 
         <button

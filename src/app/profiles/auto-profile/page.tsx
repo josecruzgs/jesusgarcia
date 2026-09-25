@@ -833,6 +833,7 @@ export default function AutoProfilePage() {
               loading={loadingProfiles}
               selected={manualSelected}
               onChange={setManualSelected}
+              pickLeastUsed
             />
           </Card>
 

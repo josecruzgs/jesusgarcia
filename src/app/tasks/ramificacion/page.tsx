@@ -252,6 +252,7 @@ export default function RamificacionCampaignPage() {
             loading={loading}
             selected={selected}
             onChange={setSelected}
+            pickLeastUsed
           />
         </Card>
 
