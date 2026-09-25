@@ -6,6 +6,7 @@ import TaskLogModel from "@/lib/models/TaskLog";
 import ProfileModel from "@/lib/models/Profile";
 import { connectToProfile, disconnectProfile } from "./browser";
 import { parseFacebookCommentTarget } from "@/lib/commentLinks";
+import { unirseAlGrupo, type Persona } from "./groupJoin";
 
 type Step = {
   action:
@@ -22,7 +23,8 @@ type Step = {
     | "uploadFile"
     | "likeComment"
     | "captureComment"
-    | "replyComment";
+    | "replyComment"
+    | "joinGroup";
   selector?: string;
   value?: string;
   url?: string;
@@ -387,6 +389,8 @@ type StepContext = {
   onResult?: (r: { url: string | null; perfilUrl: string | null }) => void;
   /** La publicación a la que la tarea navegó al arrancar. Ver ensureOnTargetUrl. */
   targetUrl?: string;
+  /** Quién es el perfil: con esto "joinGroup" contesta las preguntas del grupo en su voz. */
+  persona?: Persona;
 };
 
 function normalizePageText(value: string) {
@@ -1858,6 +1862,17 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
       );
       return;
     }
+    case "joinGroup": {
+      // `value` es el contexto que escribió el operador para responder el
+      // formulario de ingreso (de dónde es la gente, por qué le interesa).
+      await unirseAlGrupo(page, {
+        persona: ctx.persona ?? { name: ctx.profileName },
+        contexto: step.value ?? "",
+        log: (level, message) => log(ctx.taskId, level, message),
+        assertNoBlocker: () => assertNoKnownBlocker(page),
+      });
+      return;
+    }
     case "likeComment": {
       const commentId = step.commentId?.trim();
       if (!commentId) throw new Error("Step 'likeComment' requiere 'commentId'");
@@ -2154,6 +2169,7 @@ export async function runTask(taskId: string) {
           profileName: profile.name,
           taskType: task.type,
           targetUrl,
+          persona: { name: profile.name, age: profile.age, gender: profile.gender },
           onResult: ({ url, perfilUrl }) => {
             if (url) task.resultUrl = url;
             if (perfilUrl) task.resultProfileUrl = perfilUrl;

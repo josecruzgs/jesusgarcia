@@ -60,14 +60,37 @@ export const GET = withAuth(async (user, req: NextRequest) => {
     // a ejecutarse, así que no gastaron el perfil. Las que están en cola sí
     // suman: ya están comprometidas, y no contarlas haría que dos campañas
     // creadas seguidas eligieran a los mismos.
-    const uso: { _id: unknown; n: number }[] = await TaskModel.aggregate([
-      { $match: { profileId: { $in: profiles.map((p) => p._id) }, status: { $ne: "cancelled" } } },
-      { $group: { _id: "$profileId", n: { $sum: 1 } } },
+    //
+    // De paso marca los que AdsPower ya no reconoce: quedan en Mongo cuando se
+    // borran del lado de AdsPower sin volver a sincronizar, y como nunca
+    // corrieron nada tienen cero tareas — "los menos usados" los elegía
+    // primero a todos. Por eso aquí se miran también las canceladas: el
+    // "Profile does not exist" cuenta venga de la tarea que venga.
+    const uso: { _id: unknown; n: number; missing: number }[] = await TaskModel.aggregate([
+      { $match: { profileId: { $in: profiles.map((p) => p._id) } } },
+      {
+        $group: {
+          _id: "$profileId",
+          n: { $sum: { $cond: [{ $ne: ["$status", "cancelled"] }, 1, 0] } },
+          missing: {
+            $max: {
+              $cond: [
+                { $regexMatch: { input: { $ifNull: ["$error", ""] }, regex: "Profile does not exist" } },
+                1,
+                0,
+              ],
+            },
+          },
+        },
+      },
     ]);
-    const porPerfil = new Map(uso.map((u) => [String(u._id), u.n]));
+    const porPerfil = new Map(uso.map((u) => [String(u._id), u]));
 
     return NextResponse.json({
-      profiles: profiles.map((p) => ({ ...p, taskCount: porPerfil.get(String(p._id)) ?? 0 })),
+      profiles: profiles.map((p) => {
+        const u = porPerfil.get(String(p._id));
+        return { ...p, taskCount: u?.n ?? 0, missingInAdsPower: Boolean(u?.missing) };
+      }),
     });
   }
 

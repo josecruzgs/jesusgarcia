@@ -32,6 +32,7 @@ if (
   models.Campaign &&
   (!cachedTypes?.includes("likecomment") ||
     !cachedTypes?.includes("ramificacion") ||
+    !cachedTypes?.includes("joingroup") ||
     !cachedCampaignSchema?.path("ownerId"))
 ) {
   mongoose.deleteModel("Campaign");

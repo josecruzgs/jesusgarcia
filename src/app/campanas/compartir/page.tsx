@@ -39,6 +39,7 @@ const TYPE_LABELS: Record<string, string> = {
   like: "Likes",
   likecomment: "Likes a comentarios",
   comment: "Comentarios",
+  joingroup: "Unirse a grupos",
   post: "Publicaciones",
   warmup: "Warmup",
   scrape: "Scrapping",

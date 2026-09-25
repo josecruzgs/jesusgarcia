@@ -27,6 +27,7 @@ export const TYPE_LABELS: Record<string, string> = {
   like: "Likes",
   likecomment: "Likes a comentarios",
   comment: "Comentarios",
+  joingroup: "Unirse a grupos",
   ramificacion: "Ramificaciones",
   post: "Publicaciones",
   warmup: "Warmup",

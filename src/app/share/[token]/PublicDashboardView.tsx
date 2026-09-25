@@ -20,6 +20,7 @@ import {
   Tornado,
   UserCog,
   LogIn,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 import Card from "@/components/Card";
@@ -59,6 +60,7 @@ const TYPE_LABELS: Record<string, string> = {
   like: "Likes",
   likecomment: "Likes a comentarios",
   comment: "Comentarios",
+  joingroup: "Unirse a grupos",
   post: "Publicaciones",
   warmup: "Warmup",
   scrape: "Scrapping",
@@ -70,6 +72,7 @@ const TYPE_ICONS: Record<string, LucideIcon> = {
   like: Heart,
   likecomment: MessageCircleHeart,
   comment: MessageSquare,
+  joingroup: UsersRound,
   post: Megaphone,
   warmup: Activity,
   scrape: Tornado,
@@ -81,6 +84,7 @@ const TYPE_ICON_BG: Record<string, string> = {
   like: "bg-series-3",
   likecomment: "bg-series-3",
   comment: "bg-series-5",
+  joingroup: "bg-series-2",
   post: "bg-series-7",
   warmup: "bg-series-4",
   scrape: "bg-series-1",
