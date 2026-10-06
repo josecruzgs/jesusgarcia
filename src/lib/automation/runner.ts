@@ -1018,6 +1018,189 @@ async function prepareFacebookLike(page: Page, ctx: StepContext) {
   );
 }
 
+/**
+ * Marca del corazón de la publicación en Instagram. Ver markInstagramPostLike.
+ */
+const INSTAGRAM_POST_LIKE_MARK = "data-lotificadora-ig-like";
+
+/** Cómo se rotula el corazón vacío, por idioma. Se comparan normalizados. */
+const INSTAGRAM_LIKE_LABELS = ["like", "me gusta", "j'aime", "curtir", "mi piace", "gefallt mir", "begen"];
+
+/** Y el corazón lleno: la publicación ya tiene el like de este perfil. */
+const INSTAGRAM_UNLIKE_LABELS = [
+  "unlike",
+  "ya no me gusta",
+  "je n'aime plus",
+  "descurtir",
+  "non mi piace piu",
+  "gefallt mir nicht mehr",
+  "begenmekten vazgec",
+];
+
+/** El globito de comentar: solo existe en la barra de acciones de un post o reel. */
+const INSTAGRAM_COMMENT_ICON_LABELS = ["comment", "comentar", "comentario", "commenter", "commenta", "kommentieren", "yorum yap"];
+
+const INSTAGRAM_LIKE_VERIFY_MS = 6000;
+
+/** Si el paso es el like de una publicación de Instagram. */
+function esLikeDeInstagram(page: Page, selector: string, ctx: StepContext) {
+  if (ctx.taskType !== "like") return false;
+  const url = (ctx.targetUrl ?? page.url()).toLowerCase();
+  if (!url.includes("instagram.com")) return false;
+  return /svg\[aria-label=/.test(selector);
+}
+
+/**
+ * Busca el corazón de la publicación de Instagram y lo deja marcado.
+ *
+ * El preset de Instagram es `svg[aria-label="Like"]`, y ese corazón no es solo
+ * el del post: cada comentario lleva uno idéntico, con el mismo rótulo. En la
+ * vista de una publicación la lista de comentarios va ANTES que la barra de
+ * acciones en el DOM, así que el primer match era el corazón del primer
+ * comentario. La tarea le daba like a un comentario, no a la publicación, y
+ * salía por éxito porque el click había funcionado.
+ *
+ * Lo que separa al corazón del post es la compañía: comparte barra con el
+ * globito de comentar, que los comentarios no tienen. Se parte de ese globito y
+ * se sube hasta el primer ancestro que contenga un corazón.
+ *
+ * Con varios posts montados (el visor de reels) se queda con el que está en
+ * pantalla.
+ */
+async function markInstagramPostLike(page: Page): Promise<PostLikeProbe> {
+  await defineEsbuildNameHelper(page);
+  return page.evaluate(
+    ({ mark, likeLabels, unlikeLabels, commentLabels }): PostLikeProbe => {
+      const normalizar = (valor: string) =>
+        valor
+          .normalize("NFD")
+          .replace(/[̀-ͯ]/g, "")
+          .toLowerCase()
+          .replace(/\s+/g, " ")
+          .trim();
+      const rotulo = (el: Element) => normalizar(el.getAttribute("aria-label") ?? "");
+      const visible = (el: Element) => {
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      };
+      const enPantalla = (el: Element) => {
+        const rect = el.getBoundingClientRect();
+        return rect.bottom > 0 && rect.top < window.innerHeight;
+      };
+
+      for (const marked of Array.from(document.querySelectorAll(`[${mark}]`))) marked.removeAttribute(mark);
+
+      const svgs = Array.from(document.querySelectorAll("svg[aria-label]")).filter(visible);
+      const globitos = svgs.filter((el) => commentLabels.includes(rotulo(el)));
+      if (!globitos.length) return { status: "not_found", detail: "no hay barra de acciones en la página" };
+
+      const ordenados = [...globitos.filter(enPantalla), ...globitos.filter((el) => !enPantalla(el))];
+      for (const globito of ordenados) {
+        let nodo: Element | null = globito;
+        for (let i = 0; i < 6 && nodo; i += 1) {
+          nodo = nodo.parentElement;
+          if (!nodo) break;
+          const corazon = Array.from(nodo.querySelectorAll("svg[aria-label]")).find((el) => {
+            const r = rotulo(el);
+            return visible(el) && (likeLabels.includes(r) || unlikeLabels.includes(r));
+          });
+          if (!corazon) continue;
+
+          const boton = corazon.closest('[role="button"], button') ?? corazon;
+          boton.setAttribute(mark, "1");
+          (boton as HTMLElement).scrollIntoView?.({ block: "center" });
+          const etiqueta = corazon.getAttribute("aria-label") ?? "";
+          return unlikeLabels.includes(rotulo(corazon))
+            ? { status: "already_liked", detail: etiqueta }
+            : { status: "ready", detail: etiqueta };
+        }
+      }
+
+      return { status: "not_found", detail: `${globitos.length} barra(s) sin corazón reconocible` };
+    },
+    {
+      mark: INSTAGRAM_POST_LIKE_MARK,
+      likeLabels: INSTAGRAM_LIKE_LABELS,
+      unlikeLabels: INSTAGRAM_UNLIKE_LABELS,
+      commentLabels: INSTAGRAM_COMMENT_ICON_LABELS,
+    },
+  );
+}
+
+/** Espera hasta que el corazón de la publicación esté en pantalla, puesto o no. */
+async function waitForInstagramPostLike(page: Page, ctx: StepContext, timeoutMs: number) {
+  await ensureOnTargetUrl(page, ctx);
+  await freezeReelPlayback(page);
+
+  const deadline = Date.now() + timeoutMs;
+  let probe: PostLikeProbe = { status: "not_found", detail: "" };
+  while (Date.now() <= deadline) {
+    await assertNoKnownBlocker(page);
+    probe = await markInstagramPostLike(page);
+    if (probe.status !== "not_found") return probe;
+
+    if (page.url().includes("/accounts/login") || (await hasVisibleLocator(page, 'input[name="password"]'))) {
+      throw new Error(
+        "Instagram pidió iniciar sesión con este perfil, así que no hay botón de like. Hay que dejar la " +
+          "sesión abierta en el perfil de AdsPower antes de volver a correr la tarea.",
+      );
+    }
+    await page.waitForTimeout(VISIBLE_POLL_MS);
+  }
+
+  throw new Error(
+    `No se encontró el botón de like de la publicación de Instagram (${probe.detail}). Botones visibles en la ` +
+      `página: ${await describeVisibleButtons(page)}`,
+  );
+}
+
+/**
+ * Da like a la publicación de Instagram y comprueba que quedó puesto.
+ *
+ * La comprobación es lo que faltaba: antes el paso terminaba en el click, y
+ * cualquier click que no tirara error —sobre el corazón de un comentario, o uno
+ * que Instagram ignoró por tener al perfil limitado— daba la tarea por exitosa.
+ * Ahora solo es éxito si el corazón de la barra pasa a "Ya no me gusta".
+ */
+async function likeInstagramPost(page: Page, ctx: StepContext, timeoutMs: number) {
+  const probe = await waitForInstagramPostLike(page, ctx, timeoutMs);
+  if (probe.status === "already_liked") {
+    await log(ctx.taskId, "info", `La publicación ya tenía el like de este perfil (${probe.detail}); nada que hacer.`);
+    return;
+  }
+
+  const marcado = `[${INSTAGRAM_POST_LIKE_MARK}]`;
+  try {
+    const target = await firstClickableLocator(page, marcado, DEFAULT_CLICK_TIMEOUT_MS);
+    await target.locator.click({ position: target.position, timeout: DEFAULT_CLICK_TIMEOUT_MS });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!/ninguno recibe el puntero|intercepts pointer events/i.test(message)) throw err;
+
+    await log(ctx.taskId, "warn", "El corazón de la publicación está tapado por otra capa; se activa con teclado.");
+    await page.locator(marcado).first().focus({ timeout: 3000 });
+    await page.keyboard.press("Enter");
+  }
+
+  const deadline = Date.now() + INSTAGRAM_LIKE_VERIFY_MS;
+  let despues: PostLikeProbe = probe;
+  while (Date.now() <= deadline) {
+    await page.waitForTimeout(VISIBLE_POLL_MS);
+    despues = await markInstagramPostLike(page);
+    if (despues.status === "already_liked") {
+      await log(ctx.taskId, "info", `Like puesto y verificado (el corazón ahora dice "${despues.detail}").`);
+      return;
+    }
+  }
+
+  await assertNoKnownBlocker(page);
+  throw new Error(
+    `Se clickeó el corazón de la publicación pero Instagram no registró el like (sigue diciendo ` +
+      `"${despues.detail}"). Suele ser el perfil con las acciones limitadas ("Inténtalo más tarde") o una capa ` +
+      `que se comió el click.`,
+  );
+}
+
 async function prepareSelectorTarget(page: Page, rawSelector: string, ctx: StepContext) {
   if (ctx.taskType === "like" && isFacebookLikeSelector(rawSelector)) {
     await prepareFacebookLike(page, ctx);
@@ -1688,6 +1871,10 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
       return;
     case "click":
       if (!step.selector) throw new Error("Step 'click' requiere 'selector'");
+      if (esLikeDeInstagram(page, step.selector, ctx)) {
+        await likeInstagramPost(page, ctx, step.ms ?? DEFAULT_ACTION_TIMEOUT_MS);
+        return;
+      }
       {
         const timeoutMs = step.ms ?? DEFAULT_CLICK_TIMEOUT_MS;
         await prepareSelectorTarget(page, step.selector, ctx);
@@ -1978,6 +2165,10 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
       return;
     case "waitForSelector":
       if (!step.selector) throw new Error("Step 'waitForSelector' requiere 'selector'");
+      if (esLikeDeInstagram(page, step.selector, ctx)) {
+        await waitForInstagramPostLike(page, ctx, step.ms ?? DEFAULT_ACTION_TIMEOUT_MS);
+        return;
+      }
       {
         await prepareSelectorTarget(page, step.selector, ctx);
         const selector = await selectorForStep(page, step.selector, ctx);
