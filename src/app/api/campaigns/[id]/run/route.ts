@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Types } from "mongoose";
 import { dbConnect } from "@/lib/mongodb";
 import CampaignModel from "@/lib/models/Campaign";
 import TaskModel from "@/lib/models/Task";
@@ -25,8 +26,14 @@ export const POST = withAuth(
     // Cuerpo opcional: "Ejecutar pendientes" no manda nada y sigue significando
     // lo de siempre. El `catch` es para eso —un POST sin body revienta el
     // .json()—, no para tragarse un JSON mal formado.
-    const body = (await req.json().catch(() => ({}))) as { status?: unknown };
+    const body = (await req.json().catch(() => ({}))) as { status?: unknown; excludeProfileIds?: unknown };
     const from = typeof body.status === "string" ? body.status : "pending";
+    // Perfiles que no se relanzan aunque tengan tareas en ese estado: los que
+    // "Relanzar fallidas" quiso eliminar por revisión de seguridad y no pudo
+    // (tenían una tarea corriendo). Relanzarlos sería mandarlos a fallar de nuevo.
+    const excludeProfileIds = Array.isArray(body.excludeProfileIds)
+      ? body.excludeProfileIds.filter((v): v is string => typeof v === "string" && Types.ObjectId.isValid(v))
+      : [];
 
     if (!RELAUNCHABLE.has(from)) {
       return NextResponse.json(
@@ -36,7 +43,11 @@ export const POST = withAuth(
     }
 
     const result = await TaskModel.updateMany(
-      { campaignId: id, status: from },
+      {
+        campaignId: id,
+        status: from,
+        ...(excludeProfileIds.length ? { profileId: { $nin: excludeProfileIds.map((v) => new Types.ObjectId(v)) } } : {}),
+      },
       // Se limpia el error viejo: si vuelve a fallar querés ver por qué falló
       // ESTA vez, y si sale bien no puede quedar un error de la corrida
       // anterior colgado en la fila.

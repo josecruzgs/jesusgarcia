@@ -123,6 +123,18 @@ function frenadoPorFacebook(task: CampaignTask) {
   return Boolean(task.error?.includes("Facebook detuvo este perfil"));
 }
 
+/**
+ * Si la tarea falló porque Facebook mandó el perfil a revisión de seguridad.
+ *
+ * Es el único freno que "Relanzar fallidas" limpia sin preguntar perfil por
+ * perfil: esa cuenta no vuelve sin que alguien entre a mano, y relanzarle la
+ * tarea es solo otra fallida más. Sin acentos porque así lo escribe
+ * `knownPlatformBlocker`.
+ */
+function enRevisionDeSeguridad(task: CampaignTask) {
+  return (task.error ?? "").includes("Facebook detuvo este perfil por revision de seguridad");
+}
+
 // Solo los tipos con un formulario que soporta "agregar a campaña
 // existente" (ver ExistingCampaignPicker) tienen a dónde mandar el botón.
 const TYPE_ROUTES: Record<string, string> = {
@@ -454,6 +466,99 @@ Las tareas que ya se cumplieron quedan como registro.`,
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setDeletingProfileId(null);
+    }
+  }
+
+  /**
+   * Relanza todas las fallidas de la campaña, después de sacar del sistema los
+   * perfiles que Facebook mandó a revisión de seguridad.
+   *
+   * El orden importa: el borrado del perfil se lleva sus tareas fallidas, así
+   * que cuando llega el relanzado ya solo quedan las de perfiles sanos. Los que
+   * no se pudieron eliminar —tenían una tarea corriendo— se excluyen a mano del
+   * relanzado, para no mandarlos a fallar otra vez.
+   *
+   * Si AdsPower se niega a borrar uno (perfil abierto), se lo saca solo de esta
+   * app sin preguntar: con cientos de fallidas, un confirm por perfil es lo
+   * mismo que ir fila por fila.
+   */
+  async function relaunchAllFailed() {
+    if (!selectedId || !detail) return;
+
+    const failed = detail.tasks.filter((task) => task.status === "failed");
+    const blocked = new Map<string, string>();
+    for (const task of failed) {
+      if (task.profileId && enRevisionDeSeguridad(task)) blocked.set(task.profileId._id, task.profileId.name);
+    }
+    const blockedTasks = failed.filter((task) => task.profileId && blocked.has(task.profileId._id)).length;
+    const toRelaunch = failed.length - blockedTasks;
+
+    const ok = confirm(
+      blocked.size
+        ? `Hay ${blocked.size} ${blocked.size === 1 ? "perfil" : "perfiles"} en revisión de seguridad de Facebook.
+
+1. Se eliminan de esta app y de AdsPower, con sus tareas fallidas, en cola, pendientes y pausadas de TODAS las campañas.
+2. Se relanzan las ${toRelaunch} fallidas restantes.
+
+¿Continuar?`
+        : `¿Relanzar ${failed.length} ${failed.length === 1 ? "tarea fallida" : "tareas fallidas"}?`,
+    );
+    if (!ok) return;
+
+    setRetryingBulk(true);
+    setError(null);
+    setNotice(null);
+    try {
+      let deleted = 0;
+      let localOnly = 0;
+      const notDeleted: string[] = [];
+      const notDeletedIds: string[] = [];
+
+      for (const [profileId, name] of blocked) {
+        try {
+          try {
+            const r = await apiFetch<DeleteProfileResult>(`/api/profiles/${profileId}?withTasks=true`, {
+              method: "DELETE",
+            });
+            if (!r.adsPowerDeleted) localOnly++;
+          } catch (e) {
+            if (!(e instanceof ApiError) || e.status !== 409 || !e.data.canDeleteLocal) throw e;
+            await apiFetch(`/api/profiles/${profileId}?withTasks=true&localOnly=true`, { method: "DELETE" });
+            localOnly++;
+          }
+          deleted++;
+        } catch {
+          notDeleted.push(name);
+          notDeletedIds.push(profileId);
+        }
+      }
+
+      const { queuedCount } = await apiFetch<{ queuedCount: number }>(`/api/campaigns/${selectedId}/run`, {
+        method: "POST",
+        body: JSON.stringify({ status: "failed", excludeProfileIds: notDeletedIds }),
+      });
+
+      const partes = [`${queuedCount} ${queuedCount === 1 ? "tarea relanzada" : "tareas relanzadas"}.`];
+      if (deleted) {
+        partes.push(
+          `${deleted} ${deleted === 1 ? "perfil eliminado" : "perfiles eliminados"} por revisión de seguridad` +
+            (localOnly ? ` (${localOnly} solo de esta app: AdsPower no los dejó borrar).` : "."),
+        );
+      }
+      setNotice(partes.join(" "));
+      if (notDeleted.length) {
+        setError(
+          `No se pudieron eliminar ${notDeleted.length} ${notDeleted.length === 1 ? "perfil" : "perfiles"} y sus fallidas no se relanzaron: ${notDeleted.join(", ")}.`,
+        );
+      }
+
+      await Promise.all([load(), loadCampaign(selectedId, true)]);
+      setTaskFilter("queued");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      await Promise.all([load(), loadCampaign(selectedId, true)]).catch(() => {});
+    } finally {
+      setRetryingBulk(false);
     }
   }
 
@@ -802,6 +907,18 @@ Las tareas que ya se cumplieron quedan como registro.`,
                 >
                   <Play className="h-4 w-4" /> {runningPending ? "Encolando..." : "Ejecutar pendientes"}
                 </button>
+                {esAdmin && (
+                  <button
+                    type="button"
+                    disabled={!selectedCampaign?.counts.failed || retryingBulk}
+                    onClick={relaunchAllFailed}
+                    title="Eliminar los perfiles en revisión de seguridad y relanzar el resto de las fallidas"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-critical/30 bg-page px-3 py-2 text-sm font-medium text-critical transition-colors hover:bg-critical/10 disabled:pointer-events-none disabled:opacity-40"
+                  >
+                    <RotateCcw className={`h-4 w-4 ${retryingBulk ? "animate-spin" : ""}`} />
+                    {retryingBulk ? "Relanzando..." : `Relanzar fallidas (${selectedCampaign?.counts.failed ?? 0})`}
+                  </button>
+                )}
                 {pausedInDetail > 0 ? (
                   <button
                     type="button"
@@ -909,8 +1026,15 @@ Las tareas que ya se cumplieron quedan como registro.`,
                           <button
                             type="button"
                             disabled={retryingBulk}
-                            onClick={retryFiltered}
-                            title="Encolar todas las tareas que estás viendo"
+                            // Con las fallidas a la vista, el admin relanza con
+                            // la misma limpieza que el botón de arriba: primero
+                            // salen los perfiles en revisión de seguridad.
+                            onClick={esAdmin && taskFilter === "failed" ? relaunchAllFailed : retryFiltered}
+                            title={
+                              esAdmin && taskFilter === "failed"
+                                ? "Eliminar los perfiles en revisión de seguridad y relanzar el resto de las fallidas"
+                                : "Encolar todas las tareas que estás viendo"
+                            }
                             className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-1.5 text-sm font-medium text-ink-secondary transition-colors hover:text-ink disabled:pointer-events-none disabled:opacity-40"
                           >
                             <RotateCcw className="h-3.5 w-3.5" />
