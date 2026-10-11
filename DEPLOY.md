@@ -130,7 +130,7 @@ Y ahí cambiá estas cuatro:
 
 ```bash
 SESSION_SECRET=                      # firma las sesiones — generarla, ver abajo
-NEXT_PUBLIC_SHARE_BASE_URL=https://jesusgarcia.kognitic.io
+NEXT_PUBLIC_SHARE_BASE_URL=https://sender.kognitic.io
 ADSPOWER_API_BASE_URL=http://127.0.0.1:50325   # AdsPower corre acá — sección 6
 ADSPOWER_API_KEY=                    # vacío si dejás la verificación apagada
 ```
@@ -183,7 +183,7 @@ pm2 logs jesusgarcia-listening --lines 50
 
 Apuntá un registro **A** de tu dominio a la IP del VPS y esperá a que propague.
 
-El archivo ya viene con `jesusgarcia.kognitic.io`; si usás otro dominio, cambialo ahí.
+El archivo ya viene con `sender.kognitic.io`; si usás otro dominio, cambialo ahí.
 
 ```bash
 sudo cp deploy/nginx.conf /etc/nginx/sites-available/jesusgarcia
@@ -192,7 +192,7 @@ sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
 
 sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d jesusgarcia.kognitic.io
+sudo certbot --nginx -d sender.kognitic.io
 ```
 
 Certbot deja la renovación automática configurada.
@@ -543,7 +543,7 @@ En GitHub → Settings → Webhooks → Add webhook:
 
 | Campo | Valor |
 |---|---|
-| Payload URL | `https://jesusgarcia.kognitic.io/_deploy/github` |
+| Payload URL | `https://sender.kognitic.io/_deploy/github` |
 | Content type | `application/json` |
 | Secret | el mismo de `/etc/jesusgarcia-webhook.env` |
 | Events | Just the push event |
