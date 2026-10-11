@@ -79,7 +79,7 @@ export default function Topbar() {
   const session = useSession();
   const city = findCity(session?.preferences.city);
   const clock = useClock(city.timeZone);
-  const brandTitle = session?.preferences.brandTitle?.trim() || "Jesús García";
+  const brandTitle = session?.preferences.brandTitle?.trim() || "Sender";
   const avatar = session?.preferences.avatar || "";
 
   async function logout() {

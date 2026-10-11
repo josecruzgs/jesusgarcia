@@ -14,9 +14,9 @@ const UNMOUNT_MS = 2350;
  * pestaña —la marca vive en sessionStorage— y se puede saltar con un clic.
  */
 export default function Splash({
-  name = "Jesús García",
+  name = "Sender",
   tag = "Sala de Inteligencia",
-  lead = "Equipo Jesús García",
+  lead = "Equipo Sender",
   icon = "eye",
   color = "var(--steel)",
   storageKey = "splash-seen",

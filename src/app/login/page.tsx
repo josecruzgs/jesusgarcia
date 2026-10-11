@@ -66,10 +66,13 @@ function LoginForm() {
         className="card-surface animate-fade-in-up relative z-10 flex w-full max-w-sm flex-col gap-4 p-7"
       >
         <div className="flex flex-col items-center gap-2 text-center">
-          <Image src="/media/logoblack.png" alt="Jesús García · USO INTERNO" width={44} height={44} className="object-contain dark:hidden" />
-          <Image src="/media/logo.png" alt="Jesús García · USO INTERNO" width={44} height={44} className="hidden object-contain dark:block" />
-          <h1 className="font-display mt-1 text-2xl font-semibold tracking-[-0.02em] text-ink">Jesús García</h1>
-          <p className="label-mono-sm">Equipo Jesús García · USO INTERNO</p>
+          {/* El logo completo ya dice el nombre, así que el h1 queda solo para
+              lectores de pantalla. sender-logo-dark.png es el mismo con la
+              palabra en blanco: el verde oscuro original no se lee sobre fondo oscuro. */}
+          <h1 className="sr-only">Sender</h1>
+          <Image src="/media/sender-logo.png" alt="Sender" width={180} height={50} className="object-contain dark:hidden" priority />
+          <Image src="/media/sender-logo-dark.png" alt="Sender" width={180} height={50} className="hidden object-contain dark:block" priority />
+          <p className="label-mono-sm mt-1">Equipo Sender · USO INTERNO</p>
           <p className="mt-2 flex items-center gap-1.5 text-[13px] text-ink-secondary">
             <Lock className="h-3.5 w-3.5" /> Ingresa con tu usuario para continuar
           </p>
@@ -111,7 +114,7 @@ function LoginForm() {
           {loading ? "Entrando..." : "Entrar"}
         </button>
 
-        <p className="classchip mx-auto mt-1">Equipo Jesús García · USO INTERNO</p>
+        <p className="classchip mx-auto mt-1">Equipo Sender · USO INTERNO</p>
       </form>
     </div>
   );

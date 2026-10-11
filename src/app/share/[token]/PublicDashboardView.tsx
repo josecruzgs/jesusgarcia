@@ -209,8 +209,7 @@ export default function PublicDashboardView({
     <div className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Image src="/media/logoblack.png" alt="Jesús García" width={36} height={36} className="object-contain dark:hidden" />
-          <Image src="/media/logo.png" alt="Jesús García" width={36} height={36} className="hidden object-contain dark:block" />
+          <Image src="/media/sender-isotipo.png" alt="Sender" width={36} height={36} className="object-contain" />
           <div>
             <h1 className="text-2xl font-semibold text-ink">{name}</h1>
             <p className="label-mono-sm mt-1 normal-case tracking-normal">

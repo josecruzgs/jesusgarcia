@@ -9,7 +9,7 @@ import { useSession } from "@/lib/session";
 import { CITIES, findCity } from "@/lib/timezones";
 
 const HOUSE_ACCENT = "#2f5f86";
-const HOUSE_TITLE = "Jesús García";
+const HOUSE_TITLE = "Sender";
 
 const AVATAR_SIZE = 256;
 
@@ -235,7 +235,7 @@ export default function AjustesPage() {
               value={brandSubtitle}
               onChange={(e) => setBrandSubtitle(e.target.value)}
               maxLength={60}
-              placeholder="Equipo Jesús García"
+              placeholder="Equipo Sender"
               className="w-72 rounded-lg border border-hairline bg-page px-3 py-2 text-sm outline-none focus:border-primary"
             />
           </div>

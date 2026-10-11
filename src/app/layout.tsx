@@ -32,19 +32,12 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Jesús García",
+  title: "Sender",
   description: "Panel para automatizar cuentas de redes sociales",
-  // Apunta directo a public/media/*.png en vez de mantener una copia en
-  // src/app/icon.png: así el favicon nunca se puede desincronizar del logo
-  // cuando se reemplacen esos archivos. logo.png es blanco (para navegador
-  // en modo oscuro) y logoblack.png es negro (para modo claro) — el
-  // navegador elige según la preferencia de color del sistema operativo.
-  icons: {
-    icon: [
-      { url: "/media/logoblack.png", media: "(prefers-color-scheme: light)" },
-      { url: "/media/logo.png", media: "(prefers-color-scheme: dark)" },
-    ],
-  },
+  // favicon.png es el isotipo recortado y bajado a 128 px: el isotipo.png
+  // original pesa casi 1 MB, demasiado para algo que se pide en cada pestaña.
+  // Es verde sobre transparente y se lee igual en barras claras y oscuras.
+  icons: { icon: "/media/favicon.png" },
 };
 
 export default async function RootLayout({

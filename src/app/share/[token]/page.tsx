@@ -16,7 +16,7 @@ export async function generateMetadata({
   const { token } = await params;
   await dbConnect();
   const dashboard = await DashboardModel.findOne({ token }).select("name").lean();
-  return { title: dashboard ? `${dashboard.name} — Jesús García` : "Dashboard no encontrado" };
+  return { title: dashboard ? `${dashboard.name} — Sender` : "Dashboard no encontrado" };
 }
 
 async function getDashboard(token: string) {

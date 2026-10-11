@@ -120,36 +120,16 @@ const NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-const BRAND_TITLE = "Jesús García";
-const BRAND_SUBTITLE = "Equipo Jesús García";
+const BRAND_TITLE = "Sender";
+const BRAND_SUBTITLE = "Equipo Sender";
 
 // El label solo aparece luego de que el ancho terminó de animar (~200ms):
 // mostrarlo de inmediato al expandir hace que el texto se monte a su ancho
 // natural mientras el <aside> todavía está angosto y se ve "chocado".
 const EXPAND_LABEL_DELAY = 180;
 
-// El toggle de tema (ThemeToggle) muta la clase "dark" en <html> directo por
-// DOM, sin pasar por React — un MutationObserver es la forma más simple de
-// enterarse del cambio sin tener que levantar un context/provider solo para
-// esto.
-function useIsDark() {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    setIsDark(root.classList.contains("dark"));
-
-    const observer = new MutationObserver(() => setIsDark(root.classList.contains("dark")));
-    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
-    return () => observer.disconnect();
-  }, []);
-
-  return isDark;
-}
-
 export default function Sidebar() {
   const pathname = usePathname();
-  const isDark = useIsDark();
   const session = useSession();
   const [collapsed, setCollapsed] = useState(false);
   const [showLabels, setShowLabels] = useState(true);
@@ -246,7 +226,7 @@ export default function Sidebar() {
             />
           ) : (
             <Image
-              src={isDark ? "/media/logo.png" : "/media/logoblack.png"}
+              src="/media/sender-isotipo.png"
               alt={title}
               width={36}
               height={36}
