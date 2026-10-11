@@ -1,6 +1,6 @@
 export default function Card({
   className = "",
-  /** Color del filo superior; por defecto el azul acero de la marca. */
+  /** Color del filo superior; por defecto el verde de la marca. */
   accent = "var(--steel)",
   /** Levanta al pasar el mouse. Solo para tarjetas navegables. */
   interactive = false,

@@ -107,26 +107,29 @@
      bajo que se ve en el chasis y en el aire entre tarjetas, nunca debajo de
      un texto. En claro va casi al mínimo — sobre tinta negra, cualquier subida
      de tono del fondo cuesta contraste. */
-  --mica-tint: #3f7cb8;
+  --mica-tint: #1f9d55;
   --mica-strength: 7%;
 
   /* --- Acento de marca ---
-     El azul acero. Cada tema usa su propia versión porque un solo valor no
-     puede leerse en los dos: en claro va hundido (#2f5f86, 6:1 como texto
+     El verde de Sender, sacado del logo. El token se sigue llamando --steel
+     (de cuando era azul acero) porque lo usan decenas de archivos y el nombre
+     no cambia nada. Cada tema usa su propia versión porque un solo valor no
+     puede leerse en los dos: en claro va hundido (#0b6b3f, 6:1 como texto
      sobre el lienzo) y en oscuro sube hasta despegarse del plano.
 
      El de oscuro además está elegido por encima del umbral de readableInk()
      (src/lib/theme.ts, luminancia > 0.45): esa función decide si un acento
-     lleva tinta clara u oscura encima, y un azul que caiga justo debajo del
-     corte recibe texto blanco con un contraste de 2:1. Al quedar del lado
-     claro, el --primary-fg que calcula coincide con el que se fija acá. */
-  --steel: #2f5f86;
-  --steel-vivid: #3f7cab;
-  --primary: #2f5f86;
+     lleva tinta clara u oscura encima, y un verde que caiga justo debajo del
+     corte —el #1dc153 del logo cae ahí— recibe texto blanco con un contraste
+     de 2:1. Al quedar del lado claro, el --primary-fg que calcula coincide
+     con el que se fija acá. */
+  --steel: #0b6b3f;
+  --steel-vivid: #13894f;
+  --primary: #0b6b3f;
   --primary-fg: #ffffff;
 
   /* --- Los cuatro elementos ---
-     Los cuatro apuntan al acento, que es el azul acero de la casa o el color
+     Los cuatro apuntan al acento, que es el verde de la casa o el color
      que el usuario haya elegido en /ajustes. La señal de en qué sección estás
      la dan el ícono, el título y el menú, no el color.
 
@@ -242,14 +245,14 @@
   --shadow-dialog: 0 32px 64px rgba(0, 0, 0, 0.65);
 
   /* Sobre plano oscuro el mica puede subir: no le está comiendo contraste a
-     ninguna tinta y es lo que hace que el chasis se lea acero y no gris. */
-  --mica-tint: #3f7cb8;
+     ninguna tinta y es lo que hace que el chasis se lea verde y no gris. */
+  --mica-tint: #1f9d55;
   --mica-strength: 16%;
 
-  --steel: #96bcdd;
-  --steel-vivid: #b3d1ec;
-  --primary: #96bcdd;
-  /* Tinta oscura sobre el acero claro — con blanco encima no pasa contraste. */
+  --steel: #4ade80;
+  --steel-vivid: #86efac;
+  --primary: #4ade80;
+  /* Tinta oscura sobre el verde claro — con blanco encima no pasa contraste. */
   --primary-fg: #0a0d14;
 
   /* Igual que en claro: los cuatro elementos son el acento (ver :root). */

@@ -1,5 +1,5 @@
 /**
- * Acento personal: reemplaza el azul acero de la casa por el color que eligió el
+ * Acento personal: reemplaza el verde de la casa por el color que eligió el
  * usuario. NO toca los cuatro elementos — Agua, Viento, Tierra y Fuego siguen
  * pintando sus módulos con su color, que es la señal de en qué sección estás.
  *

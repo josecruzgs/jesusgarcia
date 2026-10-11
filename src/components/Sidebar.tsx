@@ -47,7 +47,7 @@ type NavSection = {
 
 // Un solo acento para todo el menú. Antes cada elemento traía el suyo (Agua
 // azul, Viento celeste, Tierra verde, Fuego naranja); ahora los cinco grupos
-// usan el acento de la casa, que es el azul acero o el color que el usuario haya
+// usan el acento de la casa, que es el verde de Sender o el color que el usuario haya
 // elegido en /ajustes — `text-steel` resuelve a --steel, y accentStyle() lo
 // reescribe en línea sobre <html>.
 //
