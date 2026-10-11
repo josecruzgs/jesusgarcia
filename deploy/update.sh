@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # El "Actualizar" de DEPLOY.md, hecho script para que lo pueda disparar el
-# webhook. Se puede correr a mano igual: `bash ~/godeye/deploy/update.sh`.
+# webhook. Se puede correr a mano igual: `bash ~/jesusgarcia/deploy/update.sh`.
 set -uo pipefail
 
 # Se corre desde una copia porque el `git reset` de más abajo reescribe ESTE
@@ -9,6 +9,9 @@ set -uo pipefail
 # de ahí estaría ejecutando una mezcla de las dos versiones. La copia se borra
 # sola al terminar.
 if [ -z "${GODEYE_DEPLOY_COPIA:-}" ]; then
+  # El repo es el que contiene este script, salvo que el webhook diga otro. Se
+  # resuelve acá porque la copia vive en /tmp y desde ahí ya no se sabe.
+  export GODEYE_REPO_DIR="${GODEYE_REPO_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
   copia=$(mktemp) || exit 1
   cat "$0" > "$copia" || exit 1
   export GODEYE_DEPLOY_COPIA=1
@@ -16,7 +19,7 @@ if [ -z "${GODEYE_DEPLOY_COPIA:-}" ]; then
 fi
 trap 'rm -f "$0"' EXIT
 
-REPO="${GODEYE_REPO_DIR:-$HOME/godeye}"
+REPO="$GODEYE_REPO_DIR"
 BRANCH="${GODEYE_DEPLOY_BRANCH:-main}"
 # Margen de disco antes de tocar node_modules o .next. La caché de AdsPower
 # llena el disco sola, y un `npm ci` a mitad de camino sin espacio deja el
