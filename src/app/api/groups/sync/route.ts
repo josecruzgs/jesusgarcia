@@ -5,11 +5,18 @@ import UserModel from "@/lib/models/User";
 import { adsPower } from "@/lib/adspower/client";
 import { withAdmin } from "@/lib/apiHandler";
 
-// Trae los grupos desde AdsPower, sincroniza (upsert) en Mongo y borra los que
-// AdsPower ya no tiene.
+// Trae los grupos desde AdsPower y sincroniza en Mongo: upsert de lo que
+// devuelve y borrado de lo que ya no.
 //
 // Solo admin: escribe la tabla que comparten todos los usuarios y es la que
 // decide qué grupos existen para asignar permisos.
+//
+// La cuenta con la que AdsPower tiene la sesión abierta es la fuente de
+// verdad. Ojo con la consecuencia: si esa sesión se cambia por una que ve
+// menos grupos (una subcuenta de operador, por ejemplo), los grupos que esa
+// cuenta no alcanza desaparecen de acá. No es un accidente, es la decisión de
+// diseño — pero implica que el alcance del panel queda atado a qué cuenta está
+// logueada en el escritorio del servidor.
 export const POST = withAdmin(async () => {
   await dbConnect();
   const list = await adsPower.listAllGroups();
@@ -22,25 +29,35 @@ export const POST = withAdmin(async () => {
     );
   }
 
-  // AdsPower es la fuente de verdad: un grupo que ya no devuelve se borró allá
-  // y se borra acá, igual que hace la sincronización de perfiles. Si la
-  // consulta falla, listAllGroups lanza antes de llegar acá, así que una lista
-  // a medias no puede borrar de más. La lista vacía sí se trata con cuidado:
-  // es más probable que AdsPower esté respondiendo raro que el que se hayan
-  // borrado todos los grupos de golpe.
+  // Una lista vacía no borra nada. AdsPower contesta con `code: 0` y cero
+  // grupos tanto cuando la cuenta de verdad no tiene ninguno como cuando la
+  // sesión del escritorio se cayó, y el segundo caso vaciaría la tabla entera
+  // —con los permisos de todos los operadores apuntando a la nada— por un
+  // problema pasajero. Sin grupos que sincronizar no hay nada que decidir.
   let removed = 0;
+  let affectedUsers = 0;
   if (list.length > 0) {
     const currentIds = list.map((g) => g.group_id);
-    const stale = await GroupModel.find({ adsPowerGroupId: { $nin: currentIds } }, { adsPowerGroupId: 1 }).lean();
+
+    // Se avisa a quién le pega antes de borrar; el nombre del grupo ya no se
+    // puede reconstruir después.
+    const stale = await GroupModel.find({ adsPowerGroupId: { $nin: currentIds } })
+      .select("adsPowerGroupId")
+      .lean<{ adsPowerGroupId: string }[]>();
     const staleIds = stale.map((g) => g.adsPowerGroupId);
+
     if (staleIds.length > 0) {
+      // Los `groupIds` de los usuarios se dejan intactos a propósito. Son
+      // configuración escrita a mano, no un reflejo de AdsPower: si se
+      // podaran, volver a la cuenta que sí ve todo devolvería los grupos pero
+      // no a quién tenía acceso a cuáles, y eso hay que rehacerlo de memoria.
+      // Un id que no matchea ningún grupo simplemente no muestra nada, y
+      // vuelve a funcionar solo cuando el grupo reaparece.
+      affectedUsers = await UserModel.countDocuments({ groupIds: { $in: staleIds } });
       ({ deletedCount: removed } = await GroupModel.deleteMany({ adsPowerGroupId: { $in: staleIds } }));
-      // Sin esto los operadores seguirían teniendo permiso sobre un id que ya
-      // no existe, y en /usuarios contaría como un grupo asignado.
-      await UserModel.updateMany({ groupIds: { $in: staleIds } }, { $pull: { groupIds: { $in: staleIds } } });
     }
   }
 
   const groups = await GroupModel.find().sort({ name: 1 });
-  return NextResponse.json({ groups, removed });
+  return NextResponse.json({ groups, removed, affectedUsers });
 });

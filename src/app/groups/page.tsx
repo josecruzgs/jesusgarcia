@@ -29,6 +29,7 @@ export default function GroupsPage() {
   const [remark, setRemark] = useState("");
   const [creating, setCreating] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -49,9 +50,22 @@ export default function GroupsPage() {
   async function sync() {
     setSyncing(true);
     setError(null);
+    setSyncNotice(null);
     try {
-      await apiFetch("/api/groups/sync", { method: "POST" });
+      const { removed, affectedUsers } = await apiFetch<{ removed?: number; affectedUsers?: number }>(
+        "/api/groups/sync",
+        { method: "POST" },
+      );
       await load();
+      if (removed) {
+        // Se nombra a los usuarios alcanzados porque sus permisos quedan
+        // apuntando a grupos que ya no están: no se rompe nada, pero dejan de
+        // ver esos perfiles hasta que el grupo vuelva.
+        setSyncNotice(
+          `Se quitaron ${removed} grupo(s) que la cuenta de AdsPower ya no ve.` +
+            (affectedUsers ? ` ${affectedUsers} usuario(s) tenían permiso sobre alguno.` : ""),
+        );
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -108,6 +122,9 @@ export default function GroupsPage() {
       </div>
 
       {error && <p className="rounded-lg bg-critical/10 p-3 text-sm text-critical">{error}</p>}
+      {!error && syncNotice && (
+        <p className="rounded-lg bg-success/10 p-3 text-sm text-success">{syncNotice}</p>
+      )}
 
       <Card className="p-4">
         <form onSubmit={createGroup} className="flex flex-wrap items-end gap-3">
