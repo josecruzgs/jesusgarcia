@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, RotateCcw, Upload, Trash2 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import Card from "@/components/Card";
+import MotoresAdmin from "@/components/MotoresAdmin";
 import { useSession } from "@/lib/session";
 import { CITIES, findCity } from "@/lib/timezones";
 
@@ -44,6 +45,7 @@ async function toAvatarDataUrl(file: File): Promise<string> {
 
 export default function AjustesPage() {
   const session = useSession();
+  const esAdmin = session?.role === "admin";
   const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -108,7 +110,8 @@ export default function AjustesPage() {
   const selectedCity = findCity(city);
 
   return (
-    <form onSubmit={save} className="flex animate-fade-in-up flex-col gap-6">
+    <div className="flex animate-fade-in-up flex-col gap-6">
+    <form onSubmit={save} className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold text-ink">Ajustes</h1>
         <p className="label-mono-sm mt-1">
@@ -253,6 +256,24 @@ export default function AjustesPage() {
         {saved && <span className="text-[13px] text-ok">Guardado. Ya se ve aplicado.</span>}
       </div>
     </form>
+
+      {/* Lo de abajo no es personal como el resto de la pantalla: el número de
+          motores es de la máquina, y lo que se elija ahí lo sienten todas las
+          campañas. Va fuera del formulario, con su propio título, y solo lo ve
+          el admin —la API lo exige también, que es donde de verdad importa—. */}
+      {esAdmin && (
+        <section className="flex flex-col gap-4 border-t border-hairline pt-6">
+          <div>
+            <h2 className="text-lg font-semibold text-ink">Del sistema</h2>
+            <p className="label-mono-sm mt-1">Solo admin · esto sí lo notan todos</p>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+            <MotoresAdmin />
+          </div>
+        </section>
+      )}
+    </div>
   );
 }
 

@@ -53,7 +53,11 @@ module.exports = {
       name: "jesusgarcia-tasks",
       script: "node_modules/tsx/dist/cli.mjs",
       args: "src/worker/index.ts",
-      env: { NODE_ENV: "production", WORKER_TASKS: "1", WORKER_LISTENING: "0" },
+      // `WORKER_ENGINES` es cuántas tareas corre a la vez (los "motores" de
+      // /campanas). Es solo la SEMILLA: el número del día a día se cambia desde
+      // Ajustes (solo admin), vive en Mongo y el worker lo relee en caliente,
+      // sin reiniciar PM2. Arranca en 1, que es lo que corría antes.
+      env: { NODE_ENV: "production", WORKER_TASKS: "1", WORKER_LISTENING: "0", WORKER_ENGINES: "1" },
       kill_timeout: 30_000,
     },
   ],

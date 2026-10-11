@@ -2396,6 +2396,14 @@ export async function runTask(taskId: string) {
       ),
     );
   } finally {
+    // El navegador se cierra ANTES de escribir el estado final, y el orden
+    // importa desde que hay más de un motor: mientras la tarea siga en
+    // "running", ningún otro puede tomar este perfil (ver worker/index.ts). Al
+    // marcarla terminada primero quedaba una ventana de un par de segundos en
+    // la que otro motor arrancaba el navegador del mismo perfil mientras este
+    // todavía lo estaba cerrando y borrando su caché.
+    if (browser) await disconnectProfile(browser, profile.adsPowerProfileId);
+
     task.finishedAt = new Date();
     await task.save();
     // Después de guardar el estado definitivo: las ramas se abren o se cierran
@@ -2403,7 +2411,6 @@ export async function runTask(taskId: string) {
     await resolverRamasDe(task).catch((err) =>
       log(taskId, "warn", `No se pudieron resolver las ramas hijas: ${err instanceof Error ? err.message : String(err)}`),
     );
-    if (browser) await disconnectProfile(browser, profile.adsPowerProfileId);
   }
 
   return task;

@@ -25,6 +25,7 @@ import {
 import { ApiError, apiFetch } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import Card from "@/components/Card";
+import Motores from "@/components/Motores";
 import ElementIcon from "@/components/ui/ElementIcon";
 import Pagination from "@/components/Pagination";
 import StatusBadge, { STATUS_COLORS, STATUS_LABELS } from "@/components/StatusBadge";
@@ -676,6 +677,10 @@ Las tareas que ya se cumplieron quedan como registro.`,
           </Link>
         </div>
       </div>
+
+      {/* Los motores del worker, arriba de todo: cuántas tareas puede correr a
+          la vez y qué hay en cada una ahora mismo. */}
+      <Motores />
 
       {error && <p className="rounded-lg bg-critical/10 p-3 text-sm text-critical">{error}</p>}
 

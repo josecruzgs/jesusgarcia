@@ -80,6 +80,11 @@ const TaskSchema = new Schema(
     // Solo se usa mientras status === "paused": guarda a qué estado volver
     // al reanudar (una tarea "pending" no debe reanudar directo a "queued").
     resumeStatus: { type: String, enum: ["pending", "queued"] },
+    // En qué motor del worker corrió (1..N). Lo escribe el worker al tomar la
+    // tarea y sirve para dibujar los motores de /campanas: sin esto, dos tareas
+    // corriendo a la vez no se pueden repartir entre las ranuras de la pantalla.
+    // Las tareas anteriores a los motores no lo tienen; la UI las pone en el 1.
+    engine: { type: Number },
     scheduledAt: { type: Date, default: () => new Date() },
     startedAt: { type: Date },
     finishedAt: { type: Date },
@@ -122,6 +127,7 @@ function isStaleTaskModel() {
   if (!schema.path("resultUrl")) return true;
   if (!schema.path("resultProfileUrl")) return true;
   if (!schema.path("parentTaskId")) return true;
+  if (!schema.path("engine")) return true;
   const types = (schema.path("type") as { enumValues?: string[] }).enumValues ?? [];
   const actions = ((schema.path("steps") as { schema?: { path: (p: string) => { enumValues?: string[] } } }).schema?.path("action")?.enumValues) ?? [];
   return !types.includes("likecomment") || !types.includes("ramificacion") || !types.includes("joingroup") || !actions.includes("joinGroup");

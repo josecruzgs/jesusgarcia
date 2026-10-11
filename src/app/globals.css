@@ -1355,3 +1355,95 @@ body::before {
     line-height: 36px;
   }
 }
+
+/* ============================================================================
+   MOTORES
+   Las ranuras de ejecución del worker, en /campanas. Cada motor es una fila con
+   una barra de segmentos: apagada cuando la ranura está libre y recorrida por
+   una onda mientras hay una tarea adentro.
+
+   La onda no es una barra de progreso y no lo aparenta: una tarea no sabe
+   cuánto va a tardar —un warmup son minutos, un like son segundos—, así que
+   llenar segmentos "hasta el N%" sería inventar un dato. Lo que la barra dice
+   es "esto está trabajando", y el dato real (desde cuándo) va al lado en el
+   cronómetro.
+   ========================================================================== */
+
+.motor-barra {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 20px;
+}
+
+.motor-seg {
+  flex: 1 1 0;
+  min-width: 2px;
+  height: 100%;
+  border-radius: 1.5px;
+  background: var(--gridline);
+  transform-origin: bottom;
+  transition:
+    background 240ms ease,
+    opacity 240ms ease;
+}
+
+/* Ranura encendida pero sin tarea: se ve el riel, apagado. */
+.motor-libre .motor-seg {
+  opacity: 0.85;
+}
+
+/* Ranura que el worker no encendió (WORKER_ENGINES no llega hasta ella). */
+.motor-apagado .motor-seg {
+  opacity: 0.4;
+}
+
+/* Con tarea adentro. El `--d` lo pone el componente por segmento, y ese
+   desfase es lo que convierte el parpadeo en una onda que corre. */
+.motor-activo .motor-seg {
+  background: var(--gold);
+  animation: motor-onda 1.5s ease-in-out infinite;
+  animation-delay: var(--d, 0s);
+}
+
+@keyframes motor-onda {
+  0%,
+  100% {
+    opacity: 0.14;
+    transform: scaleY(0.5);
+  }
+  45% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+/* Cada motor es una tarjeta de la fila, así que la ranura vacía también tiene
+   que verse: sin fondo ni filo, los tres huecos apagados quedaban flotando y la
+   fila parecía de dos. El halo va acá y no en los segmentos porque sumar una
+   sombra por segmento son catorce capas repintándose a 1.5s. */
+.motor-fila {
+  border-radius: 12px;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border-hairline);
+  transition:
+    background 240ms ease,
+    box-shadow 240ms ease;
+}
+
+.motor-fila.motor-apagado {
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+}
+
+.motor-fila.motor-activo {
+  background: color-mix(in srgb, var(--gold) 7%, var(--surface-2));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 28%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motor-activo .motor-seg {
+    animation: none !important;
+    opacity: 0.9 !important;
+    transform: none !important;
+  }
+}
