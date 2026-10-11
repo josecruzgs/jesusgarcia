@@ -4,6 +4,7 @@ import { dbConnect } from "@/lib/mongodb";
 import CampaignModel from "@/lib/models/Campaign";
 import TaskModel from "@/lib/models/Task";
 import { withAuth } from "@/lib/apiHandler";
+import { visibleOwnerFilter } from "@/lib/auth/dal";
 
 /**
  * Desde qué estados se puede (re)lanzar en bloque.
@@ -20,7 +21,7 @@ export const POST = withAuth(
     const { id } = await params;
     await dbConnect();
 
-    const campaign = await CampaignModel.findOne({ _id: id, ownerId: user.objectId }).select("_id").lean();
+    const campaign = await CampaignModel.findOne({ _id: id, ...visibleOwnerFilter(user) }).select("_id").lean();
     if (!campaign) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
     // Cuerpo opcional: "Ejecutar pendientes" no manda nada y sigue significando

@@ -8,6 +8,7 @@ import TaskModel from "@/lib/models/Task";
 import "@/lib/models/Profile";
 import { makeCampaignSummary, type TaskStatusCounts } from "@/lib/campaigns";
 import { withAuth } from "@/lib/apiHandler";
+import { visibleOwnerFilter } from "@/lib/auth/dal";
 
 /**
  * Los tipos de campaña que trabajan sobre una publicación concreta.
@@ -46,9 +47,10 @@ export const GET = withAuth(
     const { id } = await params;
     await dbConnect();
 
-    // Por _id y ownerId en la misma consulta: una campaña ajena no se encuentra
-    // y después se rechaza, directamente no existe para este usuario.
-    const campaign = await CampaignModel.findOne({ _id: id, ownerId: user.objectId }).lean();
+    // Por _id y dueño en la misma consulta: una campaña ajena no se encuentra
+    // y después se rechaza, directamente no existe para este usuario. El admin
+    // las ve todas.
+    const campaign = await CampaignModel.findOne({ _id: id, ...visibleOwnerFilter(user) }).lean();
     if (!campaign) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
     const tasks = await TaskModel.find({ campaignId: id })
@@ -75,7 +77,7 @@ export const DELETE = withAuth(
     const { id } = await params;
     await dbConnect();
 
-    const campaign = await CampaignModel.findOne({ _id: id, ownerId: user.objectId }).select("_id").lean();
+    const campaign = await CampaignModel.findOne({ _id: id, ...visibleOwnerFilter(user) }).select("_id").lean();
     if (!campaign) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
     const runningCount = await TaskModel.countDocuments({ campaignId: id, status: "running" });

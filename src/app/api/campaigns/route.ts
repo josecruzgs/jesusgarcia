@@ -5,6 +5,7 @@ import CampaignModel from "@/lib/models/Campaign";
 import TaskModel from "@/lib/models/Task";
 import { makeCampaignSummary, type TaskStatusCounts } from "@/lib/campaigns";
 import { withAuth } from "@/lib/apiHandler";
+import { ownerNames, visibleOwnerFilter } from "@/lib/auth/dal";
 import { escapeRegex } from "@/lib/regex";
 
 type CountRow = {
@@ -22,7 +23,7 @@ export const GET = withAuth(async (user, req: NextRequest) => {
 
   await dbConnect();
 
-  const filter: Record<string, unknown> = { ownerId: user.objectId };
+  const filter: Record<string, unknown> = { ...visibleOwnerFilter(user) };
   if (type) filter.type = type;
   if (search) filter.name = { $regex: escapeRegex(search), $options: "i" };
 
@@ -45,12 +46,15 @@ export const GET = withAuth(async (user, req: NextRequest) => {
     countsByCampaign.set(key, counts);
   }
 
-  const summaries = campaignDocs.map((campaign) =>
-    makeCampaignSummary({
+  const names = await ownerNames(user, campaignDocs.map((campaign) => campaign.ownerId));
+  const summaries = campaignDocs.map((campaign) => ({
+    ...makeCampaignSummary({
       campaign,
       counts: countsByCampaign.get(String(campaign._id)) ?? {},
     }),
-  );
+    // Solo llega para el admin: es quien ve campañas de otros.
+    ownerName: names.get(String(campaign.ownerId)),
+  }));
   const filtered = status ? summaries.filter((campaign) => campaign.status === status) : summaries;
   const total = filtered.length;
   const campaigns = filtered.slice((page - 1) * pageSize, page * pageSize);

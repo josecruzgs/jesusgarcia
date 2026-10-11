@@ -3,6 +3,7 @@ import { dbConnect } from "@/lib/mongodb";
 import CampaignModel from "@/lib/models/Campaign";
 import TaskModel from "@/lib/models/Task";
 import { withAuth } from "@/lib/apiHandler";
+import { visibleOwnerFilter } from "@/lib/auth/dal";
 
 // Pausa una campaña: las tareas "pending"/"queued" pasan a "paused" (el
 // worker solo levanta tareas "queued", así que esto alcanza para que deje
@@ -13,7 +14,7 @@ export const POST = withAuth(
     const { id } = await params;
     await dbConnect();
 
-    const campaign = await CampaignModel.findOne({ _id: id, ownerId: user.objectId }).select("_id").lean();
+    const campaign = await CampaignModel.findOne({ _id: id, ...visibleOwnerFilter(user) }).select("_id").lean();
     if (!campaign) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
     // Va como pipeline de agregación —no como update normal— porque

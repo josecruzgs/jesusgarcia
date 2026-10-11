@@ -33,6 +33,8 @@ type Task = {
   steps?: { action: string; url?: string }[];
   resultUrl?: string;
   resultProfileUrl?: string;
+  /** Usuario que la creó. Solo llega para el admin. */
+  ownerName?: string;
 };
 
 /**
@@ -363,6 +365,7 @@ function TasksContent() {
                       <Link href={`/tasks/${t._id}`} className="hover:text-primary hover:underline">
                         {t.name}
                       </Link>
+                      {t.ownerName && <p className="label-mono-sm mt-0.5 font-normal normal-case">@{t.ownerName}</p>}
                     </td>
                     <td className="px-4 py-3 text-ink-secondary">{t.profileId?.name ?? "—"}</td>
                     <td className="px-4 py-3 text-ink-secondary">{t.type}</td>

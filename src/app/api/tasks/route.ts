@@ -7,6 +7,7 @@ import TaskModel from "@/lib/models/Task";
 import "@/lib/models/Profile";
 import { withAuth } from "@/lib/apiHandler";
 import { findUsableProfile } from "@/lib/auth/profiles";
+import { ownerNames, visibleOwnerFilter } from "@/lib/auth/dal";
 import { escapeRegex } from "@/lib/regex";
 
 export const GET = withAuth(async (user, req: NextRequest) => {
@@ -20,13 +21,13 @@ export const GET = withAuth(async (user, req: NextRequest) => {
 
   await dbConnect();
 
-  const filter: Record<string, unknown> = { ownerId: user.objectId };
+  const filter: Record<string, unknown> = { ...visibleOwnerFilter(user) };
   if (status) filter.status = status;
   if (type) filter.type = type;
   if (profileId) filter.profileId = profileId;
   if (search) filter.name = { $regex: escapeRegex(search), $options: "i" };
 
-  const [tasks, total] = await Promise.all([
+  const [docs, total] = await Promise.all([
     TaskModel.find(filter)
       .populate("profileId", "name adsPowerProfileId")
       .sort({ createdAt: -1 })
@@ -34,6 +35,10 @@ export const GET = withAuth(async (user, req: NextRequest) => {
       .limit(pageSize),
     TaskModel.countDocuments(filter),
   ]);
+
+  // Solo llega para el admin: es quien ve tareas de otros.
+  const names = await ownerNames(user, docs.map((task) => task.ownerId));
+  const tasks = docs.map((task) => ({ ...task.toObject(), ownerName: names.get(String(task.ownerId)) }));
 
   return NextResponse.json({ tasks, total, page, pageSize });
 });

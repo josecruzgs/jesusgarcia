@@ -48,6 +48,8 @@ type Campaign = {
   counts: Counts;
   createdAt: string;
   updatedAt: string;
+  /** Usuario que la creó. Solo llega para el admin. */
+  ownerName?: string;
 };
 
 type CampaignTask = {
@@ -794,6 +796,7 @@ Las tareas que ya se cumplieron quedan como registro.`,
                         >
                           <span className="block truncate">{campaign.name}</span>
                         </button>
+                        {campaign.ownerName && <p className="label-mono-sm mt-0.5 normal-case">@{campaign.ownerName}</p>}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex min-w-36 items-center gap-2">

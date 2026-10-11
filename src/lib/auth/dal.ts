@@ -96,3 +96,35 @@ export function canUseGroup(user: SessionUser, groupId: string | undefined | nul
 export function ownerFilter(user: SessionUser): { ownerId: Types.ObjectId } {
   return { ownerId: user.objectId };
 }
+
+/**
+ * Qué campañas y tareas alcanza a ver y manejar este usuario. El admin, las de
+ * todos: es quien supervisa lo que lanzan los operadores. El resto, solo las
+ * suyas.
+ *
+ * Es para leer y operar sobre lo que ya existe. Lo que se crea sigue a nombre
+ * de quien lo crea (`user.objectId`), y los bancos de textos, dashboards y
+ * proyectos de escucha siguen siendo de cada uno.
+ */
+export function visibleOwnerFilter(user: SessionUser): Record<string, unknown> {
+  if (isAdmin(user)) return {};
+  return { ownerId: user.objectId };
+}
+
+/**
+ * Nombre de usuario de cada dueño, para que el admin sepa de quién es cada
+ * campaña o tarea. Para un operador no se consulta nada: todo lo que ve es
+ * suyo.
+ */
+export async function ownerNames(
+  user: SessionUser,
+  ownerIds: (Types.ObjectId | string | undefined)[],
+): Promise<Map<string, string>> {
+  if (!isAdmin(user)) return new Map();
+  const ids = [...new Set(ownerIds.filter(Boolean).map(String))];
+  if (ids.length === 0) return new Map();
+  const users = await UserModel.find({ _id: { $in: ids } })
+    .select("username")
+    .lean<{ _id: Types.ObjectId; username: string }[]>();
+  return new Map(users.map((u) => [String(u._id), u.username]));
+}

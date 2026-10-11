@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/mongodb";
 import TaskModel from "@/lib/models/Task";
 import { withAuth } from "@/lib/apiHandler";
+import { visibleOwnerFilter } from "@/lib/auth/dal";
 
 // Encola la tarea para que el worker (src/worker/index.ts) la recoja y
 // ejecute. No corremos Playwright directamente en la request de Next.js
@@ -12,7 +13,7 @@ export const POST = withAuth(
     const { id } = await params;
     await dbConnect();
 
-    const task = await TaskModel.findOne({ _id: id, ownerId: user.objectId });
+    const task = await TaskModel.findOne({ _id: id, ...visibleOwnerFilter(user) });
     if (!task) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
 
     task.status = "queued";

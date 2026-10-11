@@ -15,7 +15,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { dbConnect } from "@/lib/mongodb";
-import { currentUser, allowedGroupFilter, allowedGroupIdFilter, type SessionUser } from "@/lib/auth/dal";
+import { currentUser, allowedGroupFilter, allowedGroupIdFilter, ownerFilter, visibleOwnerFilter, type SessionUser } from "@/lib/auth/dal";
 import Panel from "@/components/ui/Panel";
 import SubHead from "@/components/ui/SubHead";
 import ElementIcon from "@/components/ui/ElementIcon";
@@ -40,14 +40,14 @@ const TREND_DAYS = 14;
 // campaña es la misma acción, solo cambia dónde cae.
 const LIKE_TYPES = ["like", "likecomment"];
 
-// Este dashboard es personal: cuenta el trabajo del usuario que lo mira y los
-// perfiles y grupos que tiene permitidos. Es un Server Component, así que no
+// Este dashboard cuenta el trabajo del usuario que lo mira —o el de todos, si
+// es admin— y los perfiles y grupos que tiene permitidos. Es un Server Component, así que no
 // pasa por `withAuth` —eso envuelve rutas de API— y el alcance se resuelve acá
 // con el mismo usuario y los mismos filtros que usa el resto del sistema.
 async function getStats(user: SessionUser) {
   await dbConnect();
 
-  const mine = { ownerId: user.objectId };
+  const mine = visibleOwnerFilter(user);
   const now = new Date();
   const since14 = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - (TREND_DAYS - 1)));
   const d7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -110,8 +110,9 @@ async function getStats(user: SessionUser) {
       { $unwind: "$profile" },
       { $project: { _id: 0, name: "$profile.name", count: 1 } },
     ]),
-    CommentModel.countDocuments(mine),
-    CommentModel.countDocuments({ ...mine, used: false }),
+    // El banco de comentarios sí es de cada uno, también para el admin.
+    CommentModel.countDocuments(ownerFilter(user)),
+    CommentModel.countDocuments({ ...ownerFilter(user), used: false }),
   ]);
 
   // El día se agrupa en UTC (default de $dateToString) — se recorre y se
