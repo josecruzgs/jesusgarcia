@@ -88,7 +88,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
           <StatusBadge status={task.status} />
         </div>
         <p className="mt-1 text-sm text-ink-secondary">
-          Perfil: {task.profileId?.name ?? "—"} · Tipo: {task.type}
+          Perfil: {task.profileId?.name ?? "—"} · Tipo: {task.type === "follow" ? "Seguir perfil" : task.type}
         </p>
       </div>
 

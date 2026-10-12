@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import type { Locator, Page } from "playwright-core";
 import { dbConnect } from "@/lib/mongodb";
 import TaskModel from "@/lib/models/Task";
+import CampaignModel from "@/lib/models/Campaign";
 import TaskLogModel from "@/lib/models/TaskLog";
 import ProfileModel from "@/lib/models/Profile";
 import { connectToProfile, disconnectProfile } from "./browser";
@@ -25,6 +26,7 @@ type Step = {
     | "captureComment"
     | "replyComment"
     | "joinGroup"
+    | "followProfile"
     | "readGroupName";
   selector?: string;
   value?: string;
@@ -52,6 +54,7 @@ const DEFAULT_GOTO_TIMEOUT_MS = 60000;
 const GOTO_DOMCONTENTLOADED_GRACE_MS = 10000;
 const VISIBLE_POLL_MS = 250;
 const BLOCKER_CHECK_INTERVAL_MS = 1000;
+const FACEBOOK_FOLLOW_MARK = "data-jesusgarcia-follow-profile";
 
 const FACEBOOK_COMMENT_BOX_SELECTOR = [
   'div[role="textbox"][contenteditable="true"][aria-label*="Write a comment"]',
@@ -1868,6 +1871,324 @@ function commentProbeError(probe: CommentLikeProbe, commentId: string) {
   }
 }
 
+type FacebookFollowButtonState = "follow" | "following" | "requested" | "missing";
+
+/**
+ * El perfil a seguir no admite seguidores: solo ofrece "Agregar a amigos". No
+ * es un fallo de esta cuenta sino del destino, así que ninguna otra tarea de la
+ * campaña contra ese perfil va a poder; runTask la usa para frenarlas.
+ */
+class FollowNotAllowedError extends Error {}
+
+const FOLLOW_NOT_ALLOWED_MESSAGE =
+  'Este perfil solo permite "Agregar a amigos": no tiene activada la opción de seguir. No se envió solicitud de amistad.';
+
+type FacebookProfileHeader = {
+  state: FacebookFollowButtonState;
+  /** Cuántos menús de opciones ("⌄" junto a Mensaje, "⋯" de las pestañas) quedaron marcados. */
+  menuCount: number;
+  /** Tiene "Agregar a amigos" / "Añadir amigo": sirve para explicar por qué no se pudo seguir. */
+  hasFriendButton: boolean;
+  debug: string;
+};
+
+const FACEBOOK_FOLLOW_MAX_MENUS = 4;
+
+/**
+ * Lee el encabezado del perfil: en qué estado está el botón de seguir y qué
+ * menús de opciones hay. Se queda con los botones más cercanos al nombre (el
+ * h1) para no confundirlos con los "Seguir" de publicaciones o sugerencias.
+ *
+ * Con `markButtons` deja marcado el botón "Seguir" (`follow`) y los menús
+ * (`menu-0`, `menu-1`…, del más cercano al nombre al más lejano) para
+ * clickearlos después desde Playwright.
+ */
+async function readFacebookProfileHeader(page: Page, markButtons = false): Promise<FacebookProfileHeader> {
+  await defineEsbuildNameHelper(page);
+  return page.evaluate(
+    ({ mark, shouldMark, maxMenus }: { mark: string; shouldMark: boolean; maxMenus: number }): FacebookProfileHeader => {
+      const normalize = (value: string) =>
+        value
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .replace(/\s+/g, " ")
+          .trim();
+      const visible = (element: HTMLElement) => {
+        const style = getComputedStyle(element);
+        return Boolean(element.getClientRects().length) && style.visibility !== "hidden" && style.display !== "none";
+      };
+      const labels = (element: HTMLElement) =>
+        [element.getAttribute("aria-label") ?? "", element.innerText ?? "", element.textContent ?? ""]
+          .map(normalize)
+          .filter(Boolean);
+      // El rótulo puede venir solo ("Seguir") o con el nombre ("Seguir a Ana",
+      // "Follow Ana"), así que se compara el inicio del texto.
+      const startsWithAny = (value: string, prefixes: string[]) =>
+        prefixes.some((prefix) => value === prefix || value.startsWith(`${prefix} `));
+      const followingPrefixes = ["following", "siguiendo", "unfollow", "dejar de seguir"];
+      const requestedPrefixes = ["requested", "solicitud enviada", "solicitado", "solicitada"];
+      const followPrefixes = ["follow", "seguir"];
+      const friendPrefixes = ["agregar a amigos", "anadir amigo", "anadir a amigos", "add friend"];
+      // Los menús del perfil son botones de solo ícono ("⌄", "⋯"): o dicen
+      // "opciones" en el aria-label, o despliegan algo y no tienen texto.
+      const isOptions = (element: HTMLElement, values: string[]) =>
+        values.some((value) => /\b(options|opciones)\b/.test(value)) ||
+        ((element.hasAttribute("aria-haspopup") || element.hasAttribute("aria-expanded")) &&
+          !normalize(element.innerText ?? ""));
+      // La barra de arriba, el menú lateral y los chats también tienen h1 y
+      // botones; nada de eso es el perfil.
+      const outsideProfile = (element: Element) =>
+        Boolean(element.closest('[role="banner"], [role="navigation"], [role="complementary"], [role="dialog"]'));
+      const main = document.querySelector<HTMLElement>('[role="main"]');
+      const headings = Array.from(document.querySelectorAll<HTMLElement>("h1")).filter(
+        (element) => visible(element) && !outsideProfile(element) && normalize(element.innerText ?? ""),
+      );
+      const heading = headings.find((element) => main?.contains(element)) ?? headings[0] ?? null;
+
+      if (shouldMark) {
+        document.querySelectorAll(`[${mark}]`).forEach((element) => element.removeAttribute(mark));
+      }
+
+      const distanceFromHeading = (element: HTMLElement) => {
+        if (!heading) return 0;
+        const ancestors = new Map<Element, number>();
+        let distance = 0;
+        for (let node: Element | null = heading; node; node = node.parentElement) {
+          ancestors.set(node, distance);
+          distance += 1;
+        }
+        distance = 0;
+        for (let node: Element | null = element; node; node = node.parentElement) {
+          const headingDistance = ancestors.get(node);
+          if (headingDistance !== undefined) return distance + headingDistance;
+          distance += 1;
+        }
+        return Number.MAX_SAFE_INTEGER;
+      };
+
+      const matches: { element: HTMLElement; state: FacebookFollowButtonState; distance: number }[] = [];
+      const menus: { element: HTMLElement; distance: number }[] = [];
+      const seen: { label: string; distance: number }[] = [];
+      let hasFriendButton = false;
+      for (const element of Array.from(document.querySelectorAll<HTMLElement>('button, [role="button"]'))) {
+        if (!visible(element) || outsideProfile(element)) continue;
+        const values = labels(element);
+        const distance = distanceFromHeading(element);
+        seen.push({ label: values[0] ?? "(sin texto)", distance });
+        if (values.some((value) => startsWithAny(value, friendPrefixes))) {
+          hasFriendButton = true;
+          continue;
+        }
+        if (isOptions(element, values)) {
+          menus.push({ element, distance });
+          continue;
+        }
+        let state: FacebookFollowButtonState = "missing";
+        if (values.some((value) => startsWithAny(value, followingPrefixes))) state = "following";
+        else if (values.some((value) => startsWithAny(value, requestedPrefixes))) state = "requested";
+        else if (values.some((value) => startsWithAny(value, followPrefixes))) state = "follow";
+        if (state === "missing") continue;
+        matches.push({ element, state, distance });
+      }
+      matches.sort((a, b) => a.distance - b.distance);
+      menus.sort((a, b) => a.distance - b.distance);
+      const first = matches[0];
+      const nearMenus = menus.slice(0, maxMenus);
+      if (shouldMark) {
+        if (first?.state === "follow") first.element.setAttribute(mark, "follow");
+        nearMenus.forEach((menu, index) => menu.element.setAttribute(mark, `menu-${index}`));
+      }
+      seen.sort((a, b) => a.distance - b.distance);
+      return {
+        state: first?.state ?? "missing",
+        menuCount: nearMenus.length,
+        hasFriendButton,
+        debug:
+          `h1: ${heading ? JSON.stringify(normalize(heading.innerText ?? "").slice(0, 60)) : "ninguno"}; ` +
+          `botones cercanos: ${seen
+            .slice(0, 15)
+            .map((item) => JSON.stringify(item.label.slice(0, 40)))
+            .join(", ")}`,
+      };
+    },
+    { mark: FACEBOOK_FOLLOW_MARK, shouldMark: markButtons, maxMenus: FACEBOOK_FOLLOW_MAX_MENUS },
+  );
+}
+
+/**
+ * Lee el menú desplegable abierto ("⋯" del perfil) y marca la opción "Seguir"
+ * si está. "Dejar de seguir" en el menú significa que ya se sigue.
+ */
+type FacebookFollowMenu = { state: "follow" | "following" | "missing"; items: string[] };
+
+async function readFacebookFollowMenu(page: Page): Promise<FacebookFollowMenu> {
+  await defineEsbuildNameHelper(page);
+  return page.evaluate((mark: string): FacebookFollowMenu => {
+    const normalize = (value: string) =>
+      value
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim();
+    const visible = (element: HTMLElement) => {
+      const style = getComputedStyle(element);
+      return Boolean(element.getClientRects().length) && style.visibility !== "hidden" && style.display !== "none";
+    };
+    // Las opciones a veces traen una descripción debajo: solo cuenta la
+    // primera línea, que es el rótulo.
+    const firstLine = (element: HTMLElement) => normalize((element.innerText ?? "").split("\n")[0] ?? "");
+    const startsWithAny = (value: string, prefixes: string[]) =>
+      prefixes.some((prefix) => value === prefix || value.startsWith(`${prefix} `));
+
+    document.querySelectorAll(`[${mark}="item"]`).forEach((element) => element.removeAttribute(mark));
+    let state: FacebookFollowMenu["state"] = "missing";
+    const items: string[] = [];
+    for (const element of Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]'))) {
+      if (!visible(element)) continue;
+      const values = [firstLine(element), normalize(element.getAttribute("aria-label") ?? "")];
+      items.push(values[0] || values[1]);
+      if (values.some((value) => startsWithAny(value, ["unfollow", "dejar de seguir"]))) {
+        return { state: "following", items };
+      }
+      if (state === "missing" && values.some((value) => startsWithAny(value, ["follow", "seguir"]))) {
+        element.setAttribute(mark, "item");
+        state = "follow";
+      }
+    }
+    return { state, items };
+  }, FACEBOOK_FOLLOW_MARK);
+}
+
+/** Abre uno de los menús del perfil (por orden de cercanía al nombre) y espera sus opciones. */
+async function openFacebookProfileOptions(page: Page, index: number): Promise<FacebookFollowMenu> {
+  await readFacebookProfileHeader(page, true);
+  const target = await firstClickableLocator(page, `[${FACEBOOK_FOLLOW_MARK}="menu-${index}"]`, DEFAULT_CLICK_TIMEOUT_MS);
+  await target.locator.click({ position: target.position, timeout: DEFAULT_CLICK_TIMEOUT_MS });
+  const deadline = Date.now() + 5000;
+  let menu = await readFacebookFollowMenu(page);
+  while (menu.state === "missing" && Date.now() < deadline) {
+    await page.waitForTimeout(300);
+    menu = await readFacebookFollowMenu(page);
+  }
+  return menu;
+}
+
+/**
+ * Muchos perfiles personales muestran "Agregar a amigos" como botón principal
+ * y dejan "Seguir" escondido en un menú: el "⌄" junto a "Mensaje" o el "⋯" de
+ * las pestañas. Se prueban en orden hasta dar con "Seguir", se sigue desde ahí
+ * y se confirma reabriendo ese menú, que pasa a ofrecer "Dejar de seguir".
+ *
+ * Si ninguno lo tiene, el perfil no permite seguidores. No se manda solicitud
+ * de amistad en su lugar: es otra acción, y Facebook vigila más las masivas.
+ */
+async function followFromProfileOptions(page: Page, ctx: StepContext, header: FacebookProfileHeader) {
+  const seen: string[] = [];
+  let menuIndex = -1;
+  for (let index = 0; index < header.menuCount; index += 1) {
+    const menu = await openFacebookProfileOptions(page, index);
+    if (menu.state === "following") {
+      await page.keyboard.press("Escape");
+      await log(ctx.taskId, "info", "Este perfil ya seguía a la cuenta; no se hizo ningún cambio.");
+      return;
+    }
+    if (menu.state === "follow") {
+      menuIndex = index;
+      break;
+    }
+    seen.push(`[${menu.items.map((item) => JSON.stringify(item)).join(", ") || "vacío"}]`);
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(500);
+  }
+  if (menuIndex < 0) {
+    if (header.hasFriendButton) {
+      throw new FollowNotAllowedError(`${FOLLOW_NOT_ALLOWED_MESSAGE} Menús revisados: ${seen.join(" ")}.`);
+    }
+    throw new Error(
+      'El perfil no tiene "Seguir" ni en el encabezado ni en sus menús. Puede que la cuenta no permita seguidores o que Facebook no se lo muestre a este perfil. ' +
+        `Menús revisados: ${seen.join(" ")}. Lo que se vio: ${header.debug}.`,
+    );
+  }
+
+  const item = await firstClickableLocator(page, `[${FACEBOOK_FOLLOW_MARK}="item"]`, DEFAULT_CLICK_TIMEOUT_MS);
+  await item.locator.click({ position: item.position, timeout: DEFAULT_CLICK_TIMEOUT_MS });
+  await page.waitForTimeout(2000);
+  await assertNoKnownBlocker(page);
+
+  const after = await readFacebookProfileHeader(page);
+  if (after.state === "following" || after.state === "requested") {
+    await log(ctx.taskId, "info", "Seguimiento confirmado en el perfil (desde su menú de opciones).");
+    return;
+  }
+  const confirm = await openFacebookProfileOptions(page, menuIndex);
+  await page.keyboard.press("Escape");
+  if (confirm.state === "following") {
+    await log(ctx.taskId, "info", "Seguimiento confirmado en el perfil (desde su menú de opciones).");
+    return;
+  }
+  throw new Error(
+    'Se hizo clic en "Seguir" desde el menú de opciones, pero Facebook no confirmó el seguimiento. Verifica el perfil antes de reintentar.',
+  );
+}
+
+async function followFacebookProfile(page: Page, ctx: StepContext) {
+  await assertNoKnownBlocker(page);
+  let header = await readFacebookProfileHeader(page, true);
+  if (header.state === "missing" && !header.menuCount && !header.hasFriendButton) {
+    // Pasa cuando la página todavía no terminó de pintar el encabezado.
+    await page.waitForTimeout(4000);
+    await assertNoKnownBlocker(page);
+    header = await readFacebookProfileHeader(page, true);
+  }
+  if (header.state === "following") {
+    await log(ctx.taskId, "info", "Este perfil ya seguía a la cuenta; no se hizo ningún cambio.");
+    return;
+  }
+  if (header.state === "requested") {
+    await log(ctx.taskId, "info", "Ya había una solicitud de seguimiento pendiente para esta cuenta.");
+    return;
+  }
+  if (header.state === "missing") {
+    if (header.menuCount) {
+      await followFromProfileOptions(page, ctx, header);
+      return;
+    }
+    if (header.hasFriendButton) throw new FollowNotAllowedError(FOLLOW_NOT_ALLOWED_MESSAGE);
+    throw new Error(
+      'No se encontró un botón "Seguir" reconocible en el perfil. Revisa el link, el idioma de Facebook y que esta cuenta permita seguirlo. ' +
+        `Lo que se vio: ${header.debug}.`,
+    );
+  }
+
+  const target = await firstClickableLocator(page, `[${FACEBOOK_FOLLOW_MARK}="follow"]`, DEFAULT_CLICK_TIMEOUT_MS);
+  await target.locator.click({ position: target.position, timeout: DEFAULT_CLICK_TIMEOUT_MS });
+
+  const deadline = Date.now() + 10000;
+  let lastBlockerCheckAt = 0;
+  while (Date.now() <= deadline) {
+    if (Date.now() - lastBlockerCheckAt >= BLOCKER_CHECK_INTERVAL_MS) {
+      lastBlockerCheckAt = Date.now();
+      await assertNoKnownBlocker(page);
+    }
+    const { state } = await readFacebookProfileHeader(page);
+    if (state === "following") {
+      await log(ctx.taskId, "info", "Seguimiento confirmado en el perfil.");
+      return;
+    }
+    if (state === "requested") {
+      await log(ctx.taskId, "info", "Facebook registró la solicitud de seguimiento.");
+      return;
+    }
+    await page.waitForTimeout(300);
+  }
+
+  throw new Error(
+    'Se hizo clic en "Seguir", pero Facebook no confirmó que el seguimiento quedara activo. Verifica el perfil antes de reintentar.',
+  );
+}
+
 async function runStep(page: Page, step: Step, ctx: StepContext) {
   switch (step.action) {
     case "goto":
@@ -2084,6 +2405,9 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
       await log(ctx.taskId, "info", `${step.url} → ${nombre}`);
       return;
     }
+    case "followProfile":
+      await followFacebookProfile(page, ctx);
+      return;
     case "likeComment": {
       const commentId = step.commentId?.trim();
       if (!commentId) throw new Error("Step 'likeComment' requiere 'commentId'");
@@ -2334,6 +2658,31 @@ async function resolverRamasDe(task: InstanceType<typeof TaskModel>) {
   await log(String(task._id), "warn", `${hijos} rama(s) hija(s) cancelada(s): ${motivo}`);
 }
 
+/**
+ * El perfil a seguir no admite seguidores: se cancelan las tareas de la
+ * campaña que todavía no corrieron contra ese mismo perfil —todas fallarían
+ * igual, y cada una gasta un navegador y una visita— y se deja el motivo en la
+ * campaña para que el operador lo vea en /campanas.
+ */
+async function detenerSeguimientoImposible(task: InstanceType<typeof TaskModel>, profileName: string) {
+  const url = (task.steps as Step[]).find((s) => s.action === "goto" && s.url)?.url;
+  if (!task.campaignId || !url) return;
+
+  const motivo = `Campaña detenida: ${url} no permite que lo sigan (solo acepta solicitudes de amistad). Lo detectó la tarea de ${profileName}.`;
+  const result = await TaskModel.updateMany(
+    {
+      campaignId: task.campaignId,
+      _id: { $ne: task._id },
+      type: "follow",
+      "steps.url": url,
+      status: { $in: ["pending", "queued", "paused"] },
+    },
+    { $set: { status: "cancelled", error: motivo, finishedAt: new Date() }, $unset: { resumeStatus: "" } },
+  );
+  await CampaignModel.updateOne({ _id: task.campaignId }, { $set: { stopReason: motivo } });
+  await log(String(task._id), "warn", `${motivo} Se cancelaron ${result.modifiedCount} tarea(s) que faltaban.`);
+}
+
 export async function runTask(taskId: string) {
   await dbConnect();
   const task = await TaskModel.findById(taskId);
@@ -2416,6 +2765,15 @@ export async function runTask(taskId: string) {
     task.status = "failed";
     task.error = err instanceof Error ? err.message : String(err);
     await log(taskId, "error", task.error);
+    if (err instanceof FollowNotAllowedError) {
+      await detenerSeguimientoImposible(task, profile.name).catch((stopErr) =>
+        log(
+          taskId,
+          "warn",
+          `No se pudo detener la campaña: ${stopErr instanceof Error ? stopErr.message : String(stopErr)}`,
+        ),
+      );
+    }
     await captureFailureScreenshot(page, taskId, profile.name).catch((screenshotErr) =>
       log(
         taskId,

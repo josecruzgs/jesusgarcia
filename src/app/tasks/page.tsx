@@ -16,6 +16,7 @@ import {
   ExternalLink,
   GitBranch,
   UsersRound,
+  UserPlus,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import StatusBadge from "@/components/StatusBadge";
@@ -76,7 +77,7 @@ type Profile = { _id: string; name: string };
 
 const PAGE_SIZE = 20;
 const STATUSES = ["pending", "queued", "running", "paused", "success", "failed", "cancelled"];
-const TYPES = ["login", "post", "warmup", "scrape", "like", "likecomment", "comment", "joingroup", "custom"];
+const TYPES = ["login", "post", "warmup", "scrape", "like", "likecomment", "comment", "joingroup", "follow", "custom"];
 
 export default function TasksPage() {
   return (
@@ -255,6 +256,12 @@ function TasksContent() {
             className="inline-flex items-center gap-1.5 rounded border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary transition-colors duration-100 hover:text-ink"
           >
             <UsersRound className="h-4 w-4" /> Unirse a grupos
+          </Link>
+          <Link
+            href="/tasks/follow"
+            className="inline-flex items-center gap-1.5 rounded border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink-secondary transition-colors duration-100 hover:text-ink"
+          >
+            <UserPlus className="h-4 w-4" /> Seguir perfiles
           </Link>
           <Link
             href="/tasks/post"

@@ -55,6 +55,10 @@ export const POST = withAuth(
       { $set: { status: "queued" }, $unset: { error: "" } },
     );
 
+    // Si el runner la había frenado, relanzarla es decir "probá de nuevo": el
+    // aviso viejo ya no aplica, y si el motivo sigue, el runner lo vuelve a poner.
+    if (result.modifiedCount) await CampaignModel.updateOne({ _id: id }, { $unset: { stopReason: "" } });
+
     return NextResponse.json({ queuedCount: result.modifiedCount });
   },
 );

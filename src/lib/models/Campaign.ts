@@ -12,6 +12,10 @@ const CampaignSchema = new Schema(
     },
     autoRun: { type: Boolean, default: false },
     taskCount: { type: Number, default: 0 },
+    // Por qué el runner frenó la campaña solo, cuando seguir corriéndola sería
+    // en vano (p. ej. el perfil a seguir no admite seguidores). Se muestra en
+    // /campanas y se borra al relanzar.
+    stopReason: { type: String },
   },
   { timestamps: true },
 );
@@ -33,7 +37,9 @@ if (
   (!cachedTypes?.includes("likecomment") ||
     !cachedTypes?.includes("ramificacion") ||
     !cachedTypes?.includes("joingroup") ||
-    !cachedCampaignSchema?.path("ownerId"))
+    !cachedTypes?.includes("follow") ||
+    !cachedCampaignSchema?.path("ownerId") ||
+    !cachedCampaignSchema?.path("stopReason"))
 ) {
   mongoose.deleteModel("Campaign");
 }

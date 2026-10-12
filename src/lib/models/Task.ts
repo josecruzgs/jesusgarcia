@@ -23,6 +23,7 @@ const StepSchema = new Schema(
         "captureComment",
         "replyComment",
         "joinGroup",
+        "followProfile",
         "readGroupName",
       ],
       required: true,
@@ -55,6 +56,7 @@ export const TASK_TYPES = [
   "comment",
   "ramificacion",
   "joingroup",
+  "follow",
   "custom",
 ] as const;
 
@@ -143,7 +145,15 @@ function isStaleTaskModel() {
   if (!schema.path("groupName")) return true;
   const types = (schema.path("type") as { enumValues?: string[] }).enumValues ?? [];
   const actions = ((schema.path("steps") as { schema?: { path: (p: string) => { enumValues?: string[] } } }).schema?.path("action")?.enumValues) ?? [];
-  return !types.includes("likecomment") || !types.includes("ramificacion") || !types.includes("joingroup") || !actions.includes("joinGroup") || !actions.includes("readGroupName");
+  return (
+    !types.includes("likecomment") ||
+    !types.includes("ramificacion") ||
+    !types.includes("joingroup") ||
+    !types.includes("follow") ||
+    !actions.includes("joinGroup") ||
+    !actions.includes("followProfile") ||
+    !actions.includes("readGroupName")
+  );
 }
 
 if (isStaleTaskModel()) {
