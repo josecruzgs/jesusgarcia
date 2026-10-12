@@ -114,6 +114,30 @@ function normalizar(value: string) {
 }
 
 /**
+ * El nombre del grupo tal como lo muestra el encabezado. Facebook no lo da sin
+ * sesión (ni a los crawlers de previews), así que la única forma de tenerlo es
+ * leerlo acá, con el perfil logueado y parado en el grupo.
+ *
+ * Va primero el h1 del área principal y, si no está, el <title> —que trae
+ * "(3) Nombre | Facebook" y hay que limpiarlo—. Vacío si no se pudo leer.
+ */
+export async function leerNombreGrupo(page: Page): Promise<string> {
+  await definirNameHelper(page);
+  const nombre = await page
+    .evaluate(() => {
+      const h1 = document.querySelector('[role="main"] h1') as HTMLElement | null;
+      const deH1 = h1?.innerText?.trim() ?? "";
+      if (deH1) return deH1;
+      return document.title
+        .replace(/^\(\d+\+?\)\s*/, "")
+        .replace(/\s*[|·-]\s*Facebook\s*$/i, "")
+        .trim();
+    })
+    .catch(() => "");
+  return /^(facebook|error)$/i.test(nombre) ? "" : nombre.slice(0, 200);
+}
+
+/**
  * En qué estado ve la página al perfil respecto del grupo, y marca el botón de
  * unirse si lo hay. Se toma el primero en orden de documento: el del encabezado
  * del grupo va antes que los "Unirte" de los grupos sugeridos de la columna.

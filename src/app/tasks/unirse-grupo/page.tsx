@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, UsersRound, CheckCircle2, SlidersHorizontal, Sparkles } from "lucide-react";
+import { ArrowLeft, UsersRound, CheckCircle2, SlidersHorizontal, Sparkles, AlertTriangle } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import StatusBadge from "@/components/StatusBadge";
 import Card from "@/components/Card";
 import Modal from "@/components/Modal";
 import ProfilePicker, { type PickerGroup, type PickerProfile } from "@/components/ProfilePicker";
 import ExistingCampaignPicker from "@/components/ExistingCampaignPicker";
+import { grupoCanonico } from "@/lib/facebookGroups";
+import GruposLanzados, { EstadoPill, type LaunchedGroup } from "./GruposLanzados";
 
 type CreatedTask = {
   _id: string;
@@ -48,6 +50,20 @@ export default function JoinGroupCampaignPage() {
   const [result, setResult] = useState<CreatedTask[] | null>(null);
   const [omitidos, setOmitidos] = useState<{ _id: string; name: string }[]>([]);
   const [createdCampaign, setCreatedCampaign] = useState<CreatedCampaign | null>(null);
+
+  const [launched, setLaunched] = useState<LaunchedGroup[]>([]);
+  const [loadingLaunched, setLoadingLaunched] = useState(true);
+
+  function cargarGrupos() {
+    return apiFetch<{ groups: LaunchedGroup[] }>("/api/tasks/join-groups")
+      .then((r) => setLaunched(r.groups))
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoadingLaunched(false));
+  }
+
+  useEffect(() => {
+    cargarGrupos();
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -89,7 +105,7 @@ export default function JoinGroupCampaignPage() {
           campaignId: campaignMode === "existing" ? existingCampaignId : undefined,
           url,
           contexto,
-          profileIds: Array.from(selected),
+          profileIds: aMandar.map((p) => p._id),
           staggerSeconds,
           autoRun,
           namePrefix,
@@ -99,6 +115,7 @@ export default function JoinGroupCampaignPage() {
       setOmitidos(r.omitidos ?? []);
       setCreatedCampaign(r.campaign);
       setSelected(new Set());
+      cargarGrupos();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -106,9 +123,30 @@ export default function JoinGroupCampaignPage() {
     }
   }
 
-  const count = selected.size;
-  const elegidos = profiles.filter((p) => selected.has(p._id));
   const urlValida = GROUP_URL.test(url.trim());
+
+  // Los perfiles que ya están en el grupo, ya pidieron entrar o tienen la
+  // tarea en curso se sacan de la selección antes de mandar: la API los
+  // descartaría igual, pero así se ve antes de crear la campaña y no después.
+  // Los que fallaron no cuentan; esos sí se pueden reintentar.
+  const canonico = urlValida ? grupoCanonico(url.trim()) : null;
+  const grupoActual = canonico ? launched.find((g) => g.url === canonico) : undefined;
+  const yaEnGrupo = new Map(
+    (grupoActual?.profiles ?? []).filter((p) => p.state !== "failed").map((p) => [p.profileId, p.state]),
+  );
+  const elegidos = profiles.filter((p) => selected.has(p._id));
+  const aMandar = elegidos.filter((p) => !yaEnGrupo.has(p._id));
+  const quitados = elegidos.filter((p) => yaEnGrupo.has(p._id));
+  const count = aMandar.length;
+
+  function quitarDeLaSeleccion() {
+    setSelected(new Set(aMandar.map((p) => p._id)));
+  }
+
+  function usarGrupo(groupUrl: string) {
+    setUrl(groupUrl);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   return (
     <div className="flex animate-fade-in-up flex-col gap-6">
@@ -207,6 +245,13 @@ export default function JoinGroupCampaignPage() {
           {url && !urlValida && (
             <p className="text-xs text-critical">Tiene que ser un link de grupo: facebook.com/groups/…</p>
           )}
+          {grupoActual && (
+            <p className="text-xs text-ink-muted">
+              Ya se lanzó: {yaEnGrupo.size} perfil{yaEnGrupo.size === 1 ? "" : "es"} unidos, con solicitud, en curso o pausados
+              {grupoActual.counts.failed > 0 && ` · ${grupoActual.counts.failed} fallido${grupoActual.counts.failed === 1 ? "" : "s"} (se pueden reintentar)`}
+              .
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col gap-1">
@@ -261,9 +306,33 @@ export default function JoinGroupCampaignPage() {
         <div className="flex flex-col gap-3 border-t border-hairline pt-4">
           {/* La tabla va paginada: sin esto, lo que marca el botón queda
               repartido en páginas que nadie está mirando. */}
-          {elegidos.length > 0 && (
+          {quitados.length > 0 && (
+            <div className="flex flex-col gap-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm">
+              <p className="flex items-center gap-2 font-medium text-ink">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
+                {quitados.length} perfil{quitados.length === 1 ? " ya está" : "es ya están"} en este grupo y no se
+                {quitados.length === 1 ? " va" : " van"} a mandar
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {quitados.map((p) => (
+                  <span key={p._id} className="inline-flex items-center gap-1.5 text-xs text-ink-secondary">
+                    {p.name || p._id}
+                    <EstadoPill state={yaEnGrupo.get(p._id)!} />
+                  </span>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={quitarDeLaSeleccion}
+                className="w-fit text-xs text-primary hover:underline"
+              >
+                Quitarlos de la selección
+              </button>
+            </div>
+          )}
+          {aMandar.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
-              {elegidos.map((p) => (
+              {aMandar.map((p) => (
                 <span
                   key={p._id}
                   className="inline-flex items-center gap-1 rounded-full border border-hairline bg-page px-2.5 py-1 text-xs text-ink"
@@ -295,6 +364,8 @@ export default function JoinGroupCampaignPage() {
               : `Mandar ${count} perfil${count === 1 ? "" : "es"} al grupo`}
         </button>
       </form>
+
+      <GruposLanzados groups={launched} loading={loadingLaunched} onUse={usarGrupo} />
 
       <Modal open={showAdvanced} onClose={() => setShowAdvanced(false)} title="Ajustes adicionales">
         <div className="flex flex-col gap-4">

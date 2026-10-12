@@ -1,4 +1,5 @@
 import mongoose, { Schema, models, model, type InferSchemaType } from "mongoose";
+import { JOIN_STATES } from "@/lib/facebookGroups";
 
 // Un "step" es una acción atómica de Playwright que el runner interpreta.
 // Ver src/lib/automation/runner.ts para la lista de acciones soportadas.
@@ -22,6 +23,7 @@ const StepSchema = new Schema(
         "captureComment",
         "replyComment",
         "joinGroup",
+        "readGroupName",
       ],
       required: true,
     },
@@ -99,6 +101,12 @@ const TaskSchema = new Schema(
     // destinos distintos y los dos sirven: uno para leer el comentario, otro
     // para ver la cuenta que lo puso.
     resultProfileUrl: { type: String },
+    // Solo para "joingroup": en qué quedó el perfil frente al grupo —unido,
+    // solicitud pendiente de los admins, o ya lo estaba de antes—. Lo escribe
+    // el step "joinGroup" y es lo que cuenta la vista de grupos lanzados.
+    joinState: { type: String, enum: JOIN_STATES },
+    // Y el nombre del grupo, leído de la página por el propio perfil.
+    groupName: { type: String },
   },
   { timestamps: true },
 );
@@ -111,6 +119,9 @@ TaskSchema.index({ campaignId: 1, status: 1 });
 // cada campaña nueva, para poner arriba a los menos usados (ver
 // src/app/api/profiles/route.ts).
 TaskSchema.index({ profileId: 1 });
+// La vista de grupos lanzados y el chequeo de "ya está en el grupo" buscan por
+// el link del grupo dentro de los steps.
+TaskSchema.index({ type: 1, "steps.url": 1 });
 // Y este es el del panel, que sí arranca siempre por dueño.
 TaskSchema.index({ ownerId: 1, status: 1, scheduledAt: 1 });
 
@@ -128,9 +139,11 @@ function isStaleTaskModel() {
   if (!schema.path("resultProfileUrl")) return true;
   if (!schema.path("parentTaskId")) return true;
   if (!schema.path("engine")) return true;
+  if (!schema.path("joinState")) return true;
+  if (!schema.path("groupName")) return true;
   const types = (schema.path("type") as { enumValues?: string[] }).enumValues ?? [];
   const actions = ((schema.path("steps") as { schema?: { path: (p: string) => { enumValues?: string[] } } }).schema?.path("action")?.enumValues) ?? [];
-  return !types.includes("likecomment") || !types.includes("ramificacion") || !types.includes("joingroup") || !actions.includes("joinGroup");
+  return !types.includes("likecomment") || !types.includes("ramificacion") || !types.includes("joingroup") || !actions.includes("joinGroup") || !actions.includes("readGroupName");
 }
 
 if (isStaleTaskModel()) {

@@ -6,7 +6,7 @@ import TaskLogModel from "@/lib/models/TaskLog";
 import ProfileModel from "@/lib/models/Profile";
 import { connectToProfile, disconnectProfile } from "./browser";
 import { parseFacebookCommentTarget } from "@/lib/commentLinks";
-import { unirseAlGrupo, type Persona } from "./groupJoin";
+import { leerNombreGrupo, unirseAlGrupo, type JoinGroupResult, type Persona } from "./groupJoin";
 
 type Step = {
   action:
@@ -24,7 +24,8 @@ type Step = {
     | "likeComment"
     | "captureComment"
     | "replyComment"
-    | "joinGroup";
+    | "joinGroup"
+    | "readGroupName";
   selector?: string;
   value?: string;
   url?: string;
@@ -387,6 +388,10 @@ type StepContext = {
   taskType: string;
   /** Lo llama "captureComment" con el permalink del comentario y el perfil del autor. */
   onResult?: (r: { url: string | null; perfilUrl: string | null }) => void;
+  /** Lo llama "joinGroup" con en qué quedó el perfil frente al grupo. */
+  onJoinState?: (state: JoinGroupResult) => void;
+  /** Y con el nombre del grupo, que se lee antes de intentar unirse. */
+  onGroupName?: (name: string) => void;
   /** La publicación a la que la tarea navegó al arrancar. Ver ensureOnTargetUrl. */
   targetUrl?: string;
   /** Quién es el perfil: con esto "joinGroup" contesta las preguntas del grupo en su voz. */
@@ -2052,12 +2057,31 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
     case "joinGroup": {
       // `value` es el contexto que escribió el operador para responder el
       // formulario de ingreso (de dónde es la gente, por qué le interesa).
-      await unirseAlGrupo(page, {
+      // El nombre se guarda aunque después falle el ingreso: es lo que
+      // identifica al grupo en /tasks/unirse-grupo.
+      const nombre = await leerNombreGrupo(page);
+      if (nombre) ctx.onGroupName?.(nombre);
+      const estado = await unirseAlGrupo(page, {
         persona: ctx.persona ?? { name: ctx.profileName },
         contexto: step.value ?? "",
         log: (level, message) => log(ctx.taskId, level, message),
         assertNoBlocker: () => assertNoKnownBlocker(page),
       });
+      ctx.onJoinState?.(estado);
+      return;
+    }
+    case "readGroupName": {
+      // Las tareas de unirse anteriores a groupName no lo tienen. Este step lo
+      // lee con el perfil parado en el grupo y se lo pone a todas las tareas
+      // de ese grupo, que es de donde sale el nombre en /tasks/unirse-grupo.
+      if (!step.url) throw new Error("Step 'readGroupName' requiere 'url'");
+      const nombre = await leerNombreGrupo(page);
+      if (!nombre) {
+        await log(ctx.taskId, "warn", `No se pudo leer el nombre de ${step.url}`);
+        return;
+      }
+      await TaskModel.updateMany({ type: "joingroup", "steps.url": step.url }, { $set: { groupName: nombre } });
+      await log(ctx.taskId, "info", `${step.url} → ${nombre}`);
       return;
     }
     case "likeComment": {
@@ -2364,6 +2388,12 @@ export async function runTask(taskId: string) {
           onResult: ({ url, perfilUrl }) => {
             if (url) task.resultUrl = url;
             if (perfilUrl) task.resultProfileUrl = perfilUrl;
+          },
+          onJoinState: (state) => {
+            task.joinState = state;
+          },
+          onGroupName: (name) => {
+            task.groupName = name;
           },
         });
 

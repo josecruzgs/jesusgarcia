@@ -5,26 +5,7 @@ import { findUsableProfiles } from "@/lib/auth/profiles";
 import { loginIfNeededSteps } from "@/lib/automation/loginSteps";
 import { addTasksToCampaign, createCampaignWithTasks, readCampaignName } from "@/lib/campaigns";
 import TaskModel from "@/lib/models/Task";
-
-/**
- * La forma canónica del grupo: `https://www.facebook.com/groups/<id o alias>/`.
- *
- * Se descarta todo lo que venga después del id (`/posts/...`, `?ref=share`)
- * porque la tarea necesita el encabezado del grupo, que es donde está el botón
- * de unirse, y porque así dos links distintos al mismo grupo se reconocen como
- * el mismo al buscar perfiles que ya lo pidieron.
- */
-function grupoCanonico(raw: string): string | null {
-  try {
-    const u = new URL(raw);
-    if (!/(^|\.)facebook\.com$/i.test(u.hostname)) return null;
-    const m = u.pathname.match(/^\/groups\/([^/?#]+)/i);
-    if (!m) return null;
-    return `https://www.facebook.com/groups/${m[1]}/`;
-  } catch {
-    return null;
-  }
-}
+import { grupoCanonico, JOIN_ACTIVE_STATUSES } from "@/lib/facebookGroups";
 
 // Crea una tarea de "unirse al grupo" por cada perfil elegido. El formulario
 // de ingreso, si el grupo tiene, lo contesta el runner con Claude usando
@@ -65,7 +46,7 @@ export const POST = withAuth(async (user, req: NextRequest) => {
     {
       type: "joingroup",
       profileId: { $in: profiles.map((p) => p._id) },
-      status: { $in: ["pending", "queued", "running", "paused", "success"] },
+      status: { $in: [...JOIN_ACTIVE_STATUSES] },
       "steps.url": url,
     },
     { profileId: 1 },
