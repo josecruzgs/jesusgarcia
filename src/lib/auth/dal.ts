@@ -27,7 +27,13 @@ type UserRow = {
   groupIds?: string[];
   active?: boolean;
   preferences?: Partial<Preferences>;
+  lastSeenAt?: Date | null;
 };
+
+// Cada cuánto se anota la última actividad. Escribir en cada request sería una
+// escritura a Mongo por cada llamada del panel; con esto alcanza para saber si
+// alguien lo está usando.
+const SEEN_EVERY_MS = 5 * 60_000;
 
 /**
  * Usuario de la request, o null si no hay sesión válida.
@@ -48,10 +54,18 @@ export const currentUser = cache(async (): Promise<SessionUser | null> => {
 
   await dbConnect();
   const user = (await UserModel.findById(session.userId)
-    .select("username role groupIds active preferences")
+    .select("username role groupIds active preferences lastSeenAt")
     .lean()) as UserRow | null;
 
   if (!user || user.active === false) return null;
+
+  const now = Date.now();
+  if (!user.lastSeenAt || now - new Date(user.lastSeenAt).getTime() > SEEN_EVERY_MS) {
+    // Sin await: anotar la actividad no tiene por qué demorar la respuesta.
+    UserModel.updateOne({ _id: user._id }, { $set: { lastSeenAt: new Date(now) } }).catch((err) =>
+      console.error("[lastSeenAt]", err),
+    );
+  }
 
   return {
     id: String(user._id),

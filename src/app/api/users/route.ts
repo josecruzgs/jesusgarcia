@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/mongodb";
+import CampaignModel from "@/lib/models/Campaign";
 import UserModel, { USER_ROLES, toPublicUser, type UserRole } from "@/lib/models/User";
 import { withAdmin } from "@/lib/apiHandler";
 import { hashPassword, passwordProblem } from "@/lib/auth/password";
@@ -8,12 +9,25 @@ import { knownGroupIds } from "@/lib/auth/groups";
 // Nunca se devuelve passwordHash: no le sirve a la interfaz y sacarlo del
 // servidor solo abre la puerta a que termine en un log o en el caché del
 // navegador.
-const PUBLIC_FIELDS = "username role groupIds active createdAt updatedAt";
+const PUBLIC_FIELDS = "username role groupIds active createdAt updatedAt lastLoginAt lastSeenAt lastLoginIp lastLoginLocation";
 
 export const GET = withAdmin(async () => {
   await dbConnect();
-  const users = await UserModel.find().select(PUBLIC_FIELDS).sort({ username: 1 }).lean();
-  return NextResponse.json({ users });
+  const [users, campaigns] = await Promise.all([
+    UserModel.find().select(PUBLIC_FIELDS).sort({ username: 1 }).lean(),
+    // Cuántas campañas lanzó cada uno y cuándo la última: el uso real, más allá
+    // de entrar al panel.
+    CampaignModel.aggregate<{ _id: unknown; count: number; last: Date }>([
+      { $group: { _id: "$ownerId", count: { $sum: 1 }, last: { $max: "$createdAt" } } },
+    ]),
+  ]);
+  const byOwner = new Map(campaigns.map((c) => [String(c._id), c]));
+  return NextResponse.json({
+    users: users.map((u) => {
+      const c = byOwner.get(String(u._id));
+      return { ...u, campaignCount: c?.count ?? 0, lastCampaignAt: c?.last ?? null };
+    }),
+  });
 });
 
 export const POST = withAdmin(async (_admin, req: NextRequest) => {

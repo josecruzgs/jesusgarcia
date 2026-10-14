@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, ShieldCheck, KeyRound, Trash2 } from "lucide-react";
+import { Plus, ShieldCheck, KeyRound, Trash2, MapPin } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
 import Card from "@/components/Card";
 import { useSession } from "@/lib/session";
@@ -14,6 +14,13 @@ type User = {
   role: Role;
   groupIds: string[];
   active: boolean;
+  createdAt?: string;
+  lastLoginAt?: string | null;
+  lastSeenAt?: string | null;
+  lastLoginIp?: string;
+  lastLoginLocation?: string;
+  campaignCount?: number;
+  lastCampaignAt?: string | null;
 };
 
 type Group = { _id: string; adsPowerGroupId: string; name: string };
@@ -24,6 +31,8 @@ export default function UsersPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Hora de la última carga: los "hace cuánto" se calculan contra esto.
+  const [now, setNow] = useState(0);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -40,6 +49,7 @@ export default function UsersPage() {
         apiFetch<{ groups: Group[] }>("/api/groups?all=true"),
       ]);
       setUsers(usersData.users);
+      setNow(Date.now());
       setGroups(groupsData.groups);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -214,6 +224,9 @@ export default function UsersPage() {
                 <th className="px-4 py-3 font-medium">Usuario</th>
                 <th className="px-4 py-3 font-medium">Rol</th>
                 <th className="px-4 py-3 font-medium">Grupos</th>
+                <th className="px-4 py-3 font-medium">Último login</th>
+                <th className="px-4 py-3 font-medium">Última actividad</th>
+                <th className="px-4 py-3 font-medium">Campañas</th>
                 <th className="px-4 py-3 font-medium">Estado</th>
                 <th className="px-4 py-3 font-medium" />
               </tr>
@@ -221,7 +234,7 @@ export default function UsersPage() {
             <tbody>
               {loading && users.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-ink-muted">
+                  <td colSpan={8} className="px-4 py-10 text-center text-ink-muted">
                     Cargando...
                   </td>
                 </tr>
@@ -253,6 +266,30 @@ export default function UsersPage() {
                           selected={u.groupIds}
                           onToggle={(gid) => toggleGroup(u, gid)}
                         />
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <When date={u.lastLoginAt} now={now} />
+                      {(u.lastLoginLocation || u.lastLoginIp) && (
+                        <span
+                          className="mt-0.5 flex items-center gap-1 whitespace-nowrap text-xs text-ink-muted"
+                          title="Aproximada, según la IP"
+                        >
+                          <MapPin className="h-3 w-3 shrink-0" />
+                          {u.lastLoginLocation || "Ubicación desconocida"}
+                          {u.lastLoginIp && <span className="opacity-70">· {u.lastLoginIp}</span>}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <When date={u.lastSeenAt} now={now} live />
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-ink">{u.campaignCount ?? 0}</span>
+                      {u.lastCampaignAt && (
+                        <span className="block text-xs text-ink-muted">
+                          última {relative(u.lastCampaignAt, now)}
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -295,6 +332,41 @@ export default function UsersPage() {
           </table>
         </div>
       </Card>
+    </div>
+  );
+}
+
+/** "hace 5 min", "hace 3 días"... */
+function relative(iso: string, now: number): string {
+  const diff = now - new Date(iso).getTime();
+  const min = Math.round(diff / 60_000);
+  if (min < 1) return "recién";
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `hace ${h} h`;
+  const d = Math.round(h / 24);
+  if (d < 30) return `hace ${d} ${d === 1 ? "día" : "días"}`;
+  const m = Math.round(d / 30);
+  return `hace ${m} ${m === 1 ? "mes" : "meses"}`;
+}
+
+/**
+ * Fecha y hora completas, con el "hace cuánto" debajo. Con `live`, un punto
+ * verde si hubo actividad en los últimos 10 minutos: lastSeenAt se anota cada
+ * cinco, así que eso es "lo está usando ahora".
+ */
+function When({ date, now, live }: { date?: string | null; now: number; live?: boolean }) {
+  if (!date) return <span className="text-xs text-ink-muted">Nunca</span>;
+  const online = live && now - new Date(date).getTime() < 10 * 60_000;
+  return (
+    <div className="whitespace-nowrap">
+      <span className="text-xs text-ink">
+        {new Date(date).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })}
+      </span>
+      <span className="flex items-center gap-1 text-xs text-ink-muted">
+        {online && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+        {online ? "en línea" : relative(date, now)}
+      </span>
     </div>
   );
 }

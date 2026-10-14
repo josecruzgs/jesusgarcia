@@ -9,6 +9,7 @@ import {
   SESSION_MAX_AGE_SECONDS,
   createSessionToken,
 } from "@/lib/auth/session";
+import { realIp, ipLocation } from "@/lib/geo";
 import { rateLimit, rateLimitReset, clientIp } from "@/lib/rateLimit";
 
 // Ocho intentos cada quince minutos y después media hora de espera. Alcanza de
@@ -47,6 +48,20 @@ export const POST = withApiErrors(async (req: NextRequest) => {
   if (!user || !ok || user.active === false) return invalid;
 
   rateLimitReset(`login:${ip}`);
+
+  const now = new Date();
+  const loginIp = realIp(req);
+  await UserModel.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        lastLoginAt: now,
+        lastSeenAt: now,
+        lastLoginIp: loginIp,
+        lastLoginLocation: await ipLocation(loginIp),
+      },
+    },
+  );
 
   const res = NextResponse.json({ ok: true });
   res.cookies.set(SESSION_COOKIE, await createSessionToken(String(user._id)), {
