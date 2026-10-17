@@ -108,7 +108,7 @@ export default function MotoresAdmin() {
   return (
     <Card className="flex flex-col gap-4 p-5">
       <div className="flex items-start gap-2.5">
-        <span className="mt-0.5 grid shrink-0 place-items-center" style={{ color: "var(--gold)" }}>
+        <span className="mt-0.5 grid shrink-0 place-items-center" style={{ color: "var(--primary)" }}>
           <Gauge className="h-4 w-4" aria-hidden />
         </span>
         <div className="min-w-0">

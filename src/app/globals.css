@@ -1401,7 +1401,7 @@ body::before {
 /* Con tarea adentro. El `--d` lo pone el componente por segmento, y ese
    desfase es lo que convierte el parpadeo en una onda que corre. */
 .motor-activo .motor-seg {
-  background: var(--gold);
+  background: var(--primary);
   animation: motor-onda 1.5s ease-in-out infinite;
   animation-delay: var(--d, 0s);
 }
@@ -1436,8 +1436,8 @@ body::before {
 }
 
 .motor-fila.motor-activo {
-  background: color-mix(in srgb, var(--gold) 7%, var(--surface-2));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 28%, transparent);
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface-2));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 28%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {

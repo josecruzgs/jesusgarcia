@@ -116,8 +116,8 @@ function Ranura({ motor }: { motor: Motor }) {
         <span
           className="grid h-6 w-6 shrink-0 place-items-center rounded-lg border border-hairline font-mono text-[11px] font-semibold tabular-nums"
           style={{
-            color: corriendo ? "var(--gold)" : "var(--text-muted, inherit)",
-            borderColor: corriendo ? "color-mix(in srgb, var(--gold) 40%, transparent)" : undefined,
+            color: corriendo ? "var(--primary)" : "var(--text-muted, inherit)",
+            borderColor: corriendo ? "color-mix(in srgb, var(--primary) 40%, transparent)" : undefined,
             opacity: motor.active ? 1 : 0.45,
           }}
         >
@@ -128,7 +128,7 @@ function Ranura({ motor }: { motor: Motor }) {
             cada final de tarea. */}
         <span
           className="shrink-0 font-mono text-[13px] tabular-nums"
-          style={{ color: corriendo ? "var(--gold)" : "transparent" }}
+          style={{ color: corriendo ? "var(--primary)" : "transparent" }}
         >
           {transcurrido ?? "—"}
         </span>
@@ -228,11 +228,11 @@ export default function Motores() {
   return (
     <section
       className="card-surface px-4.5 py-4"
-      style={{ ["--edge-c" as string]: "var(--gold)" }}
+      style={{ ["--edge-c" as string]: "var(--primary)" }}
     >
       <header className="panel-head">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="grid shrink-0 place-items-center" style={{ color: "var(--gold)" }}>
+          <span className="grid shrink-0 place-items-center" style={{ color: "var(--primary)" }}>
             <Gauge className="h-4 w-4" aria-hidden />
           </span>
           <span className="panel-title">Motores</span>
@@ -242,7 +242,7 @@ export default function Motores() {
           {enTransicion && (
             <span
               className="label-mono-sm truncate"
-              style={{ color: "var(--gold)" }}
+              style={{ color: "var(--primary)" }}
               title={
                 objetivo! < activos
                   ? "Se pidieron menos motores. Los de más se apagan al terminar la tarea que tienen adentro: cortarlos dejaría el navegador a medio cerrar."
