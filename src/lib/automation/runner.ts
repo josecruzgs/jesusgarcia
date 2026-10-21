@@ -433,6 +433,69 @@ async function assertNoKnownBlocker(page: Page) {
   if (blocker) throw new Error(blocker);
 }
 
+/**
+ * Lo que muestra Facebook en lugar de la publicación cuando este perfil no la
+ * puede ver: borrada, solo para amigos, restringida por país o por edad, o el
+ * autor bloqueó al perfil. Ya normalizado (minúsculas, sin acentos).
+ */
+const FACEBOOK_UNAVAILABLE_TEXTS = [
+  "este contenido no esta disponible",
+  "este video no esta disponible",
+  "este video ya no esta disponible",
+  "this content isn't available",
+  "this content isnt available",
+  "this video isn't available",
+  "this video is no longer available",
+  "bu icerik su anda kullanılamıyor",
+  "bu icerik kullanılamıyor",
+  "bu video kullanılamıyor",
+];
+
+/**
+ * Corta la tarea si Facebook muestra "contenido no disponible" en vez de la
+ * publicación.
+ *
+ * Sin esto el fallo aparecía como un timeout de la caja de comentario —que es
+ * una consecuencia: en esa página no hay caja— y no había forma de saber desde
+ * el log que el perfil directamente no podía ver la publicación.
+ */
+async function assertContentAvailable(page: Page) {
+  if (!page.url().includes("facebook.com")) return;
+  const bodyText = await page
+    .locator("body")
+    .innerText({ timeout: 1000 })
+    .then(normalizePageText)
+    .catch(() => "");
+  if (!FACEBOOK_UNAVAILABLE_TEXTS.some((texto) => bodyText.includes(texto))) return;
+  throw new Error(
+    `Facebook muestra "contenido no disponible" para este perfil en ${page.url()}. La publicación no es ` +
+      `visible para él: puede estar borrada, ser solo para amigos, estar restringida por país (el del proxy) ` +
+      `o por edad, o el autor bloqueó al perfil.`,
+  );
+}
+
+/**
+ * Lleva los subdominios alternativos de Facebook (web., m., mbasic., touch.)
+ * a www.
+ *
+ * Los perfiles tienen la sesión hecha en www, y un link copiado desde ciertos
+ * países o desde el celular llega como web.facebook.com o m.facebook.com:
+ * Facebook redirige o sirve otra versión de la página, y la tarea terminaba
+ * en una URL distinta a la pedida.
+ */
+function canonicalFacebookUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    if (/^(web|m|mbasic|touch|mobile)\.facebook\.com$/i.test(parsed.hostname)) {
+      parsed.hostname = "www.facebook.com";
+      return parsed.toString();
+    }
+  } catch {
+    // No es una URL absoluta: se navega tal cual y que falle donde corresponde.
+  }
+  return url;
+}
+
 function isFacebookCommentBoxSelector(selector: string) {
   return /Write a comment|Escribe un comentario|yorum yaz/i.test(selector);
 }
@@ -1230,6 +1293,10 @@ async function prepareSelectorTarget(page: Page, rawSelector: string, ctx: StepC
 
   if (await hasVisibleLocator(page, FACEBOOK_COMMENT_BOX_SELECTOR)) return;
 
+  // Si no hay publicación que ver, los tres intentos de abajo son tiempo
+  // perdido y terminan en un timeout que no explica nada.
+  await assertContentAvailable(page);
+
   // Se reintenta porque en el visor de Reels esto no es determinista: los
   // mismos pasos sobre el mismo reel a veces abren el panel y a veces no,
   // según qué capa haya aparecido, si el video ya se pasó al siguiente, o si
@@ -1281,7 +1348,8 @@ function isNavigationTimeout(err: unknown) {
   return /page\.goto: Timeout|Timeout .* exceeded|waiting until "domcontentloaded"/i.test(message);
 }
 
-async function gotoPage(page: Page, url: string, timeoutMs: number, ctx: StepContext) {
+async function gotoPage(page: Page, rawUrl: string, timeoutMs: number, ctx: StepContext) {
+  const url = canonicalFacebookUrl(rawUrl);
   const beforeUrl = page.url();
   try {
     await page.goto(url, { waitUntil: "commit", timeout: timeoutMs });
@@ -2523,6 +2591,11 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
         try {
           await firstVisibleLocator(page, selector, step.ms ?? DEFAULT_ACTION_TIMEOUT_MS);
         } catch (err) {
+          // La página pudo terminar de pintar el aviso mientras se esperaba la
+          // caja: se prefiere ese motivo al timeout.
+          if (esTareaDeComentario(ctx.taskType) && isFacebookCommentBoxSelector(step.selector)) {
+            await assertContentAvailable(page);
+          }
           if (ctx.taskType !== "like" || !isFacebookLikeSelector(step.selector)) throw err;
 
           // Una publicación que ya tiene la reacción no muestra el botón de
