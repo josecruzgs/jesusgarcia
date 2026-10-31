@@ -859,15 +859,26 @@ async function markFacebookPostLike(page: Page): Promise<PostLikeProbe> {
       const textOf = (el: Element) => (el.textContent ?? "").replace(/\s+/g, " ").trim();
       const nombreDe = (el: Element) => ariaOf(el) || textOf(el);
 
+      const visible = (el: Element) => {
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      };
+      const botonesDe = (root: ParentNode) =>
+        (Array.from(root.querySelectorAll('[role="button"], button')) as HTMLElement[]).filter(visible);
+
       // El post abierto en dialog manda: en esa vista la página de atrás sigue
       // montada con su propio feed, y sus botones son los de otras publicaciones.
-      const root: ParentNode = document.querySelector('div[role="dialog"]') ?? document;
-      const botones = (Array.from(root.querySelectorAll('[role="button"], button')) as HTMLElement[]).filter(
-        (el) => {
-          const rect = el.getBoundingClientRect();
-          return rect.width > 0 && rect.height > 0;
-        },
-      );
+      // Pero Facebook tiene varios `role="dialog"` montados —vacíos, ocultos, el
+      // de una notificación— y quedarse con el primero del DOM era buscar en uno
+      // que no tenía el post: "0 match(es)" con el botón a la vista. Vale el
+      // dialog visible que tenga barra de acciones, el de más arriba primero.
+      // Si ninguno la tiene, el post no está en un dialog y se busca en la página.
+      const dialogs = (Array.from(document.querySelectorAll('div[role="dialog"]')) as HTMLElement[])
+        .filter(visible)
+        .filter((d) => botonesDe(d).some((b) => contiene(nombreDe(b), [...rowLabels, ...shareLabels])))
+        .reverse();
+      const root: ParentNode = dialogs[0] ?? document;
+      const botones = botonesDe(root);
 
       // La fila de acciones a la que pertenece un botón.
       //
@@ -963,7 +974,9 @@ async function markFacebookPostLike(page: Page): Promise<PostLikeProbe> {
           .join(", ");
         return {
           status: "not_found",
-          detail: `${botones.length} boton(es) mirados, ${candidatos.length} con rótulo de reaccionar${
+          detail: `${botones.length} boton(es) mirados ${
+            dialogs.length ? "en el dialog del post" : "en la página (sin dialog con barra de acciones)"
+          }, ${candidatos.length} con rótulo de reaccionar${
             descartados ? `: ${descartados}` : ""
           }`,
         };
@@ -1028,7 +1041,7 @@ async function scrollFacebookPost(page: Page) {
     .catch(() => {});
 }
 
-const BUSCAR_LIKE_INTENTOS = 4;
+const BUSCAR_LIKE_INTENTOS = 6;
 
 /**
  * Deja la publicación en condiciones de que se pueda reaccionar.
