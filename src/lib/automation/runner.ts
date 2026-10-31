@@ -67,6 +67,12 @@ const FACEBOOK_COMMENT_BOX_SELECTOR = [
   'div[role="textbox"][contenteditable="true"][aria-placeholder*="yorum yaz" i]',
   'div[aria-label*="yorum yaz" i]',
   'form div[role="textbox"][contenteditable="true"]',
+  // "Comenta como Johana…" en el build actual; en minúsculas y por subcadena
+  // para que alcance también a "Comment as…" y "Escribe un comentario…".
+  'div[role="textbox"][contenteditable="true"][aria-label*="coment" i]',
+  'div[role="textbox"][contenteditable="true"][aria-label*="comment" i]',
+  'div[role="textbox"][contenteditable="true"][aria-placeholder*="coment" i]',
+  'div[role="textbox"][contenteditable="true"][aria-placeholder*="comment" i]',
 ].join(", ");
 
 /**
@@ -1285,13 +1291,122 @@ async function likeInstagramPost(page: Page, ctx: StepContext, timeoutMs: number
   );
 }
 
-async function prepareSelectorTarget(page: Page, rawSelector: string, ctx: StepContext) {
+/**
+ * Marcas de la caja de comentario y del botón de comentar de LA publicación.
+ *
+ * Con el post abierto en dialog, la página de atrás sigue montada con el feed,
+ * y cada post del feed tiene su propio "Comentar…". El selector suelto se
+ * quedaba con el primero del documento —el de otra publicación—: la tarea abría
+ * ese post, el chequeo de URL la devolvía a la suya, y así cada reintento hasta
+ * el timeout. Igual que con el like, se busca solo adentro del dialog del post.
+ */
+const FACEBOOK_COMMENT_BOX_MARK = "data-godeye-comment-box";
+const FACEBOOK_COMMENT_OPEN_MARK = "data-godeye-comment-open";
+
+type CommentTargets = { enDialog: boolean; caja: boolean; boton: boolean };
+
+/**
+ * Busca la caja de comentario y el botón de comentar del post y los deja marcados.
+ *
+ * La caja se reconoce por subcadena de su rótulo, en minúsculas y sin acentos:
+ * "coment" alcanza a "Escribe un comentario…", "Comenta como Johana…" (el
+ * rótulo del build actual, que el selector fijo no conocía) y "Comente como…";
+ * "comment" a "Write a comment…", "Comment as…" y al francés. Se descartan las
+ * cajas de respuesta, que viven en el mismo dialog.
+ */
+async function markFacebookCommentTargets(page: Page): Promise<CommentTargets> {
+  await defineEsbuildNameHelper(page);
+  return page
+    .evaluate(
+      ({ boxMark, openMark, rowLabels, openLabels, replyLabels }): CommentTargets => {
+        const normalizar = (valor: string) =>
+          valor
+            .normalize("NFD")
+            .replace(/[̀-ͯ]/g, "")
+            .toLowerCase()
+            .replace(/\s+/g, " ")
+            .trim();
+        const contiene = (valor: string, palabras: string[]) => {
+          const limpio = normalizar(valor);
+          return Boolean(limpio) && palabras.some((palabra) => limpio.includes(normalizar(palabra)));
+        };
+        const visible = (el: Element) => {
+          const rect = el.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        };
+        const nombreDe = (el: Element) =>
+          (el.getAttribute("aria-label") ?? "").trim() || (el.textContent ?? "").replace(/\s+/g, " ").trim();
+        const botonesDe = (root: ParentNode) =>
+          (Array.from(root.querySelectorAll('[role="button"], button')) as HTMLElement[]).filter(visible);
+
+        for (const marked of Array.from(document.querySelectorAll(`[${boxMark}], [${openMark}]`))) {
+          marked.removeAttribute(boxMark);
+          marked.removeAttribute(openMark);
+        }
+
+        // Mismo criterio que markFacebookPostLike: el dialog visible que tenga
+        // barra de acciones, el de más arriba primero.
+        const dialogs = (Array.from(document.querySelectorAll('div[role="dialog"]')) as HTMLElement[])
+          .filter(visible)
+          .filter((d) => botonesDe(d).some((b) => contiene(nombreDe(b), rowLabels)))
+          .reverse();
+        const root: ParentNode = dialogs[0] ?? document;
+
+        const cajas = (
+          Array.from(root.querySelectorAll('[role="textbox"][contenteditable="true"]')) as HTMLElement[]
+        ).filter(visible);
+        const rotuloDeCaja = (el: HTMLElement) =>
+          `${el.getAttribute("aria-label") ?? ""} ${el.getAttribute("aria-placeholder") ?? ""}`;
+        const esRespuesta = (el: HTMLElement) =>
+          contiene(rotuloDeCaja(el), [...replyLabels, "respuesta", "resposta", "reponse"]);
+        const caja =
+          cajas.find((el) => !esRespuesta(el) && contiene(rotuloDeCaja(el), ["coment", "comment"])) ??
+          cajas.find((el) => !esRespuesta(el) && el.closest("form")) ??
+          null;
+        if (caja) caja.setAttribute(boxMark, "1");
+
+        // El de la barra de acciones del post —el que comparte fila con
+        // "Compartir"— antes que cualquier otro con "comentar" en el nombre.
+        const compartir = rowLabels.filter((r) => !contiene(r, ["coment", "comment"]));
+        const enFilaConCompartir = (el: HTMLElement) => {
+          let nodo: HTMLElement | null = el;
+          for (let i = 0; i < 8; i += 1) {
+            nodo = nodo?.parentElement ?? null;
+            if (!nodo || nodo === root) return false;
+            if (botonesDe(nodo).some((v) => v !== el && contiene(nombreDe(v), compartir))) return true;
+          }
+          return false;
+        };
+        const candidatos = botonesDe(root).filter((el) => contiene(nombreDe(el), openLabels));
+        const boton = candidatos.find(enFilaConCompartir) ?? candidatos[0] ?? null;
+        if (boton) boton.setAttribute(openMark, "1");
+
+        return { enDialog: dialogs.length > 0, caja: Boolean(caja), boton: Boolean(boton) };
+      },
+      {
+        boxMark: FACEBOOK_COMMENT_BOX_MARK,
+        openMark: FACEBOOK_COMMENT_OPEN_MARK,
+        rowLabels: FACEBOOK_ACTION_ROW_LABELS,
+        openLabels: FACEBOOK_COMMENT_OPEN_LABELS,
+        replyLabels: FACEBOOK_REPLY_LABELS,
+      },
+    )
+    .catch(() => ({ enDialog: false, caja: false, boton: false }));
+}
+
+const FACEBOOK_COMMENT_BOX_MARKED = `[${FACEBOOK_COMMENT_BOX_MARK}]`;
+
+/**
+ * Prepara la página para el paso y, si encontró el elemento exacto, devuelve
+ * el selector que apunta solo a él. `null` es usar el selector del paso.
+ */
+async function prepareSelectorTarget(page: Page, rawSelector: string, ctx: StepContext): Promise<string | null> {
   if (ctx.taskType === "like" && isFacebookLikeSelector(rawSelector)) {
     await prepareFacebookLike(page, ctx);
-    return;
+    return null;
   }
 
-  if (!esTareaDeComentario(ctx.taskType) || !isFacebookCommentBoxSelector(rawSelector)) return;
+  if (!esTareaDeComentario(ctx.taskType) || !isFacebookCommentBoxSelector(rawSelector)) return null;
 
   // La comprobación de publicación va ANTES de darse por satisfecho con la
   // caja visible. Al revés —que es como estaba— el visor podía haberse pasado
@@ -1304,7 +1419,18 @@ async function prepareSelectorTarget(page: Page, rawSelector: string, ctx: StepC
   // espera de las que vienen es una oportunidad para que el visor derive.
   await freezeReelPlayback(page);
 
-  if (await hasVisibleLocator(page, FACEBOOK_COMMENT_BOX_SELECTOR)) return;
+  // La caja del post, si ya está a la vista. Con dialog, solo la de adentro:
+  // una caja del feed de atrás es la de otra publicación. Sin dialog, la
+  // página es la publicación y vale también el selector ancho.
+  const buscarCaja = async () => {
+    const marcas = await markFacebookCommentTargets(page);
+    if (marcas.caja) return { marcas, selector: FACEBOOK_COMMENT_BOX_MARKED as string | null, lista: true };
+    const lista = !marcas.enDialog && (await hasVisibleLocator(page, FACEBOOK_COMMENT_BOX_SELECTOR));
+    return { marcas, selector: null, lista };
+  };
+
+  let estado = await buscarCaja();
+  if (estado.lista) return estado.selector;
 
   // Si no hay publicación que ver, los tres intentos de abajo son tiempo
   // perdido y terminan en un timeout que no explica nada.
@@ -1320,29 +1446,46 @@ async function prepareSelectorTarget(page: Page, rawSelector: string, ctx: StepC
     // Destapar: en los reels el botón de comentar está visible pero debajo del
     // cuadro de sugerencias, y así el click nunca le llega.
     await dismissFacebookOverlays(page, ctx);
-    if (await hasVisibleLocator(page, FACEBOOK_COMMENT_BOX_SELECTOR)) return;
+    estado = await buscarCaja();
+    if (estado.lista) return estado.selector;
+
+    // Con dialog se clickea solo el "Comentar" de adentro. El selector suelto
+    // agarraba el primero del documento, que es el de un post del feed de
+    // atrás: abría otra publicación y la tarea volvía a empezar.
+    const abrir = estado.marcas.boton
+      ? `[${FACEBOOK_COMMENT_OPEN_MARK}]`
+      : estado.marcas.enDialog
+        ? null
+        : FACEBOOK_COMMENT_OPEN_SELECTOR;
 
     let target: ClickableTarget | null = null;
-    try {
-      target = await firstClickableLocator(page, FACEBOOK_COMMENT_OPEN_SELECTOR, 2500);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.startsWith("Facebook detuvo este perfil")) throw err;
+    if (abrir) {
+      try {
+        target = await firstClickableLocator(page, abrir, 2500);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.startsWith("Facebook detuvo este perfil")) throw err;
+      }
     }
 
     if (target) {
       await log(ctx.taskId, "info", "Abriendo panel/caja de comentarios de Facebook.");
       await target.locator.click({ position: target.position, timeout: 2500 }).catch(() => {});
       await page.waitForTimeout(1000);
-      if (await hasVisibleLocator(page, FACEBOOK_COMMENT_BOX_SELECTOR)) return;
+      estado = await buscarCaja();
+      if (estado.lista) return estado.selector;
     }
 
     // El botón puede seguir tapado por una capa que no sabemos cerrar; el
-    // teclado no necesita que reciba el puntero.
-    if (await openCommentsWithKeyboard(page, ctx)) return;
+    // teclado no necesita que reciba el puntero. Solo sin dialog: el selector
+    // de teclado tampoco distingue el post de la tarea de los del feed.
+    if (!estado.marcas.enDialog && (await openCommentsWithKeyboard(page, ctx))) {
+      return (await buscarCaja()).selector;
+    }
 
     if (intento < ABRIR_COMENTARIOS_INTENTOS) {
       await log(ctx.taskId, "info", `No se abrieron los comentarios; reintento ${intento + 1} de ${ABRIR_COMENTARIOS_INTENTOS}.`);
+      await scrollFacebookPost(page);
       await page.waitForTimeout(1500);
     }
   }
@@ -1352,8 +1495,11 @@ async function prepareSelectorTarget(page: Page, rawSelector: string, ctx: StepC
   await log(
     ctx.taskId,
     "warn",
-    `No se pudo abrir los comentarios. Botones visibles en la página: ${await describeVisibleButtons(page)}`,
+    `No se pudo abrir los comentarios (${
+      estado.marcas.enDialog ? "buscando en el dialog del post" : "buscando en la página"
+    }). Botones visibles en la página: ${await describeVisibleButtons(page)}`,
   );
+  return null;
 }
 
 function isNavigationTimeout(err: unknown) {
@@ -2284,8 +2430,8 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
       }
       {
         const timeoutMs = step.ms ?? DEFAULT_CLICK_TIMEOUT_MS;
-        await prepareSelectorTarget(page, step.selector, ctx);
-        const selector = await selectorForStep(page, step.selector, ctx);
+        const selector =
+          (await prepareSelectorTarget(page, step.selector, ctx)) ?? (await selectorForStep(page, step.selector, ctx));
         try {
           const target = await firstClickableLocator(page, selector, timeoutMs);
           await target.locator.click({ position: target.position, timeout: timeoutMs });
@@ -2543,8 +2689,8 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
       if (!step.selector) throw new Error("Step 'hover' requiere 'selector'");
       {
         const timeoutMs = step.ms ?? DEFAULT_ACTION_TIMEOUT_MS;
-        await prepareSelectorTarget(page, step.selector, ctx);
-        const selector = await selectorForStep(page, step.selector, ctx);
+        const selector =
+          (await prepareSelectorTarget(page, step.selector, ctx)) ?? (await selectorForStep(page, step.selector, ctx));
         const target = await firstClickableLocator(page, selector, timeoutMs);
         await target.locator.hover({ position: target.position, timeout: timeoutMs });
       }
@@ -2552,8 +2698,8 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
     case "fill":
       if (!step.selector) throw new Error("Step 'fill' requiere 'selector'");
       {
-        await prepareSelectorTarget(page, step.selector, ctx);
-        const selector = await selectorForStep(page, step.selector, ctx);
+        const selector =
+          (await prepareSelectorTarget(page, step.selector, ctx)) ?? (await selectorForStep(page, step.selector, ctx));
         const target = await firstVisibleLocator(page, selector, step.ms ?? DEFAULT_ACTION_TIMEOUT_MS);
         await target.fill(step.value ?? "", { timeout: step.ms ?? DEFAULT_ACTION_TIMEOUT_MS });
       }
@@ -2561,8 +2707,8 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
     case "type":
       if (!step.selector) throw new Error("Step 'type' requiere 'selector'");
       {
-        await prepareSelectorTarget(page, step.selector, ctx);
-        const selector = await selectorForStep(page, step.selector, ctx);
+        const selector =
+          (await prepareSelectorTarget(page, step.selector, ctx)) ?? (await selectorForStep(page, step.selector, ctx));
         const target = await firstVisibleLocator(page, selector, step.ms ?? DEFAULT_ACTION_TIMEOUT_MS);
 
         // Solo la caja de comentario pasa por la escritura verificada: es la
@@ -2584,8 +2730,8 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
       // Enter lo publica ahí.
       if (esTareaDeComentario(ctx.taskType)) await assertOnTargetUrl(page, ctx);
       if (step.selector) {
-        await prepareSelectorTarget(page, step.selector, ctx);
-        const selector = await selectorForStep(page, step.selector, ctx);
+        const selector =
+          (await prepareSelectorTarget(page, step.selector, ctx)) ?? (await selectorForStep(page, step.selector, ctx));
         const target = await firstVisibleLocator(page, selector, step.ms ?? DEFAULT_ACTION_TIMEOUT_MS);
         await target.press(step.key, { timeout: step.ms ?? DEFAULT_ACTION_TIMEOUT_MS });
       } else {
@@ -2599,8 +2745,8 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
         return;
       }
       {
-        await prepareSelectorTarget(page, step.selector, ctx);
-        const selector = await selectorForStep(page, step.selector, ctx);
+        const selector =
+          (await prepareSelectorTarget(page, step.selector, ctx)) ?? (await selectorForStep(page, step.selector, ctx));
         try {
           await firstVisibleLocator(page, selector, step.ms ?? DEFAULT_ACTION_TIMEOUT_MS);
         } catch (err) {
