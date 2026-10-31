@@ -27,6 +27,14 @@ export type PickerProfile = {
 
 type Orden = "menos-usados" | "nombre";
 
+const PLATFORM_NAMES: Record<string, string> = {
+  facebook: "Facebook",
+  instagram: "Instagram",
+  tiktok: "TikTok",
+  x: "X",
+  linkedin: "LinkedIn",
+};
+
 export default function ProfilePicker({
   profiles,
   groups,
@@ -34,6 +42,7 @@ export default function ProfilePicker({
   selected,
   onChange,
   pickLeastUsed = false,
+  platform = null,
 }: {
   profiles: PickerProfile[];
   groups: PickerGroup[];
@@ -47,6 +56,13 @@ export default function ProfilePicker({
   pickLeastUsed?: boolean;
   selected: Set<string>;
   onChange: (next: Set<string>) => void;
+  /**
+   * La plataforma de la tarea, cuando la página la sabe (sale del link pegado).
+   * Fija el filtro de plataforma y saca de la selección a los perfiles de otra:
+   * un perfil de Facebook en una tarea de Instagram abre la publicación sin
+   * sesión y la tarea falla. Los perfiles sin plataforma conocida se dejan.
+   */
+  platform?: string | null;
 }) {
   const [search, setSearch] = useState("");
   const [groupFilter, setGroupFilter] = useState("");
@@ -61,6 +77,24 @@ export default function ProfilePicker({
   const [orden, setOrden] = useState<Orden>("menos-usados");
   const [page, setPage] = useState(1);
   const [cantidad, setCantidad] = useState(10);
+
+  // Sigue al link: al pegar uno de Instagram, el filtro pasa a Instagram. Se
+  // puede cambiar a mano después; vuelve a fijarse recién si cambia el link.
+  useEffect(() => {
+    if (platform) setPlatformFilter(platform);
+  }, [platform]);
+
+  const ajenos = useMemo(
+    () => (platform ? profiles.filter((p) => selected.has(p._id) && p.platform && p.platform !== platform) : []),
+    [platform, profiles, selected],
+  );
+
+  useEffect(() => {
+    if (!ajenos.length) return;
+    const next = new Set(selected);
+    for (const p of ajenos) next.delete(p._id);
+    onChange(next);
+  }, [ajenos, selected, onChange]);
 
   function groupName(groupId: string) {
     return groups.find((g) => g.adsPowerGroupId === groupId)?.name ?? groupId;
@@ -302,6 +336,12 @@ export default function ProfilePicker({
           />
         </div>
       </div>
+
+      {platform && platformFilter === platform && (
+        <p className="-mt-1 text-xs text-ink-muted">
+          Mostrando solo perfiles de {PLATFORM_NAMES[platform] ?? platform}: es la plataforma del link.
+        </p>
+      )}
 
       <div className="overflow-hidden rounded-lg border border-hairline">
         {loading ? (

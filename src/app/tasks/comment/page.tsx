@@ -11,6 +11,7 @@ import Meter from "@/components/Meter";
 import Modal from "@/components/Modal";
 import PlatformPicker from "@/components/PlatformPicker";
 import ProfilePicker, { type PickerGroup, type PickerProfile } from "@/components/ProfilePicker";
+import { platformFromUrl } from "@/lib/platformFromUrl";
 import ExistingCampaignPicker from "@/components/ExistingCampaignPicker";
 
 type CreatedTask = {
@@ -109,6 +110,19 @@ export default function CommentCampaignPage() {
       setExistingCampaignId(cid);
     }
   }, []);
+
+  // La plataforma sale del link: pegar uno de Instagram con "Facebook"
+  // elegido mandaba la tarea con el selector y los perfiles equivocados.
+  // "Personalizado" se respeta: ahí el selector lo escribió el usuario.
+  const urlPlatform = platformFromUrl(url);
+
+  function cambiarUrl(valor: string) {
+    setUrl(valor);
+    const detectada = platformFromUrl(valor);
+    if (detectada && detectada !== platformPreset && platformPreset !== "custom" && PLATFORM_PRESETS[detectada]) {
+      applyPlatformPreset(detectada);
+    }
+  }
 
   function applyPlatformPreset(key: string) {
     const preset = PLATFORM_PRESETS[key];
@@ -376,7 +390,7 @@ export default function CommentCampaignPage() {
             required
             type="url"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => cambiarUrl(e.target.value)}
             placeholder="https://www.facebook.com/..."
             className="rounded-lg border border-hairline bg-page px-3 py-2 text-sm outline-none transition-colors focus:border-primary"
           />
@@ -424,7 +438,7 @@ export default function CommentCampaignPage() {
         )}
 
         <div className="border-t border-hairline pt-4">
-          <ProfilePicker profiles={profiles} groups={groups} loading={loading} selected={selected} onChange={setSelected} pickLeastUsed />
+          <ProfilePicker profiles={profiles} groups={groups} loading={loading} selected={selected} onChange={setSelected} pickLeastUsed platform={urlPlatform} />
         </div>
 
         {notEnough && (
