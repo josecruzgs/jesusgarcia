@@ -643,17 +643,19 @@ async function assertOnTargetUrl(page: Page, ctx: StepContext) {
   );
 }
 
+/** Devuelve si tuvo que volver a cargar la publicación. */
 async function ensureOnTargetUrl(page: Page, ctx: StepContext) {
   const objetivo = ctx.targetUrl;
-  if (!objetivo) return;
+  if (!objetivo) return false;
 
   const actual = page.url();
-  if (rutaDePublicacion(actual) === rutaDePublicacion(objetivo)) return;
+  if (rutaDePublicacion(actual) === rutaDePublicacion(objetivo)) return false;
 
   await log(ctx.taskId, "warn", `El visor se movió a otra publicación (${actual}); se vuelve a la de la tarea.`);
   await gotoPage(page, objetivo, DEFAULT_GOTO_TIMEOUT_MS, ctx);
   await page.waitForTimeout(2500);
   await freezeReelPlayback(page);
+  return true;
 }
 
 /** Cierra la capa de sugerencias, si la hay. Devuelve si cerró alguna. */
@@ -1436,18 +1438,41 @@ async function prepareSelectorTarget(page: Page, rawSelector: string, ctx: StepC
   // perdido y terminan en un timeout que no explica nada.
   await assertContentAvailable(page);
 
+  // El panel de un reel con miles de comentarios tarda varios segundos en
+  // cargar: primero muestra los esqueletos grises y recién después la caja.
+  const esperarCaja = async (ms: number) => {
+    const limite = Date.now() + ms;
+    for (;;) {
+      estado = await buscarCaja();
+      if (estado.lista || Date.now() >= limite) return estado.lista;
+      await page.waitForTimeout(700);
+    }
+  };
+
   // Se reintenta porque en el visor de Reels esto no es determinista: los
   // mismos pasos sobre el mismo reel a veces abren el panel y a veces no,
   // según qué capa haya aparecido, si el video ya se pasó al siguiente, o si
   // la interfaz todavía estaba animando. Un solo intento fallaba seguido.
+  //
+  // Pero "Comentar" abre Y CIERRA el panel. Clickearlo de nuevo —o mandarle
+  // Enter— mientras el panel todavía cargaba lo cerraba, el visor se pasaba al
+  // reel siguiente, la tarea volvía, y así hasta el timeout. Por eso se
+  // clickea una sola vez por carga de la página y después se espera.
+  let clickeado = false;
   for (let intento = 1; intento <= ABRIR_COMENTARIOS_INTENTOS; intento += 1) {
-    await ensureOnTargetUrl(page, ctx);
+    if (await ensureOnTargetUrl(page, ctx)) clickeado = false;
 
     // Destapar: en los reels el botón de comentar está visible pero debajo del
     // cuadro de sugerencias, y así el click nunca le llega.
     await dismissFacebookOverlays(page, ctx);
     estado = await buscarCaja();
     if (estado.lista) return estado.selector;
+
+    if (clickeado) {
+      await log(ctx.taskId, "info", "El panel de comentarios ya se abrió; se espera a que cargue la caja.");
+      if (await esperarCaja(6000)) return estado.selector;
+      continue;
+    }
 
     // Con dialog se clickea solo el "Comentar" de adentro. El selector suelto
     // agarraba el primero del documento, que es el de un post del feed de
@@ -1471,21 +1496,21 @@ async function prepareSelectorTarget(page: Page, rawSelector: string, ctx: StepC
     if (target) {
       await log(ctx.taskId, "info", "Abriendo panel/caja de comentarios de Facebook.");
       await target.locator.click({ position: target.position, timeout: 2500 }).catch(() => {});
-      await page.waitForTimeout(1000);
-      estado = await buscarCaja();
-      if (estado.lista) return estado.selector;
+      clickeado = true;
+      if (await esperarCaja(8000)) return estado.selector;
+      continue;
     }
 
-    // El botón puede seguir tapado por una capa que no sabemos cerrar; el
-    // teclado no necesita que reciba el puntero. Solo sin dialog: el selector
-    // de teclado tampoco distingue el post de la tarea de los del feed.
+    // El botón puede estar tapado por una capa que no sabemos cerrar; el
+    // teclado no necesita que reciba el puntero. Solo cuando el click no fue
+    // posible —si no, cerraría el panel que el click abrió— y sin dialog: el
+    // selector de teclado no distingue el post de la tarea de los del feed.
     if (!estado.marcas.enDialog && (await openCommentsWithKeyboard(page, ctx))) {
       return (await buscarCaja()).selector;
     }
 
     if (intento < ABRIR_COMENTARIOS_INTENTOS) {
       await log(ctx.taskId, "info", `No se abrieron los comentarios; reintento ${intento + 1} de ${ABRIR_COMENTARIOS_INTENTOS}.`);
-      await scrollFacebookPost(page);
       await page.waitForTimeout(1500);
     }
   }
