@@ -1532,11 +1532,61 @@ function isNavigationTimeout(err: unknown) {
   return /page\.goto: Timeout|Timeout .* exceeded|waiting until "domcontentloaded"/i.test(message);
 }
 
+// Cortes de red de la conexión (casi siempre el proxy del perfil): el mismo
+// goto unos segundos después suele entrar. No incluye timeouts, que ya tienen
+// su propio manejo, ni errores de la página en sí.
+function isTransientNetworkError(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err);
+  return /net::ERR_(CONNECTION_(CLOSED|RESET|REFUSED|ABORTED|FAILED)|EMPTY_RESPONSE|NETWORK_CHANGED|PROXY_CONNECTION_FAILED|TUNNEL_CONNECTION_FAILED|SOCKS_CONNECTION_FAILED|HTTP2_PROTOCOL_ERROR|QUIC_PROTOCOL_ERROR|SSL_PROTOCOL_ERROR|TIMED_OUT|NAME_NOT_RESOLVED|INTERNET_DISCONNECTED|ADDRESS_UNREACHABLE)/.test(
+    message,
+  );
+}
+
+const GOTO_NETWORK_RETRY_DELAYS_MS = [3000, 6000, 10000];
+
+// web.facebook.com es un alias regional; si esa conexión se corta, se prueba
+// por www. La comparación con la URL de la tarea es solo por ruta, así que el
+// cambio de host no la afecta.
+function alternateFacebookHost(url: string) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname !== "web.facebook.com") return null;
+    parsed.hostname = "www.facebook.com";
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+async function gotoWithNetworkRetries(page: Page, url: string, timeoutMs: number, ctx: StepContext) {
+  const alternate = alternateFacebookHost(url);
+  for (let intento = 0; ; intento += 1) {
+    // A partir del segundo reintento se alterna con el host de www.
+    const destino = alternate && intento >= 2 && intento % 2 === 0 ? alternate : url;
+    try {
+      await page.goto(destino, { waitUntil: "commit", timeout: timeoutMs });
+      return;
+    } catch (err) {
+      const delay = GOTO_NETWORK_RETRY_DELAYS_MS[intento];
+      if (!isTransientNetworkError(err) || delay === undefined) throw err;
+      const message = err instanceof Error ? err.message.split("\n")[0] : String(err);
+      await log(
+        ctx.taskId,
+        "warn",
+        `Se cortó la conexión al abrir la publicación (${message}); reintento ${intento + 1} de ${
+          GOTO_NETWORK_RETRY_DELAYS_MS.length
+        } en ${delay / 1000}s.`,
+      );
+      await page.waitForTimeout(delay);
+    }
+  }
+}
+
 async function gotoPage(page: Page, rawUrl: string, timeoutMs: number, ctx: StepContext) {
   const url = canonicalFacebookUrl(rawUrl);
   const beforeUrl = page.url();
   try {
-    await page.goto(url, { waitUntil: "commit", timeout: timeoutMs });
+    await gotoWithNetworkRetries(page, url, timeoutMs, ctx);
   } catch (err) {
     const currentUrl = page.url();
     const hasUsableDocument =
