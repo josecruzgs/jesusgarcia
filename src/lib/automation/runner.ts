@@ -144,6 +144,7 @@ const FACEBOOK_LIKE_LABELS = [
 
 /** Las que aparecen cuando la reacción YA está puesta — señal de trabajo hecho. */
 const FACEBOOK_UNLIKE_LABELS = [
+  "Eliminar Me gusta",
   "Remove Like",
   "Unlike",
   "Quitar Me gusta",
@@ -253,6 +254,14 @@ const FACEBOOK_LIKE_ARIA_PATTERNS = [
 const FACEBOOK_UNLIKE_ARIA_PATTERNS = [
   "quitar me gusta",
   "quitar la reaccion",
+  // El build actual: "Eliminar Me gusta de la publicación de X" y, al lado,
+  // "Cambiar reacción Me gusta". Sin estos, un post ya reaccionado no se
+  // reconocía como tal y la tarea fallaba con "no se encontró el botón".
+  "^eliminar me gusta",
+  "^eliminar (la )?reaccion",
+  "^cambiar (la )?reaccion",
+  "^change reaction",
+  "^remove reaction",
   "ya no me gusta",
   "^unlike",
   "remove like",
