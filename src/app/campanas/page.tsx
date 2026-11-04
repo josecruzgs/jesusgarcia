@@ -119,6 +119,21 @@ function relaunchVerb(status: string) {
 }
 
 /**
+ * El color del error de una tarea según qué tan grave es.
+ *
+ * Rojo solo cuando Meta detuvo el perfil (bloqueo, checkpoint, revisión): es
+ * lo que pide acción sobre la cuenta. Amarillo cuando el perfil no tiene la
+ * sesión iniciada, que se arregla entrando a mano. Azul para el resto, que
+ * son fallos de la tarea y no del perfil.
+ */
+function colorDelError(task: CampaignTask) {
+  const error = task.error ?? "";
+  if (/detuvo este perfil/.test(error)) return "text-critical";
+  if (/Usuario no logeado|cerró la sesión de este perfil/.test(error)) return "text-warning";
+  return "text-series-1";
+}
+
+/**
  * Si la tarea falló porque Facebook frenó la cuenta.
  *
  * El texto lo escribe `knownFacebookBlocker` en el runner y es el mismo para
@@ -1144,7 +1159,7 @@ Las tareas que ya se cumplieron quedan como registro.`,
                             </td>
                             <td className="px-4 py-3 text-ink-secondary">{formatDate(task.scheduledAt)}</td>
                             <td className="px-4 py-3 text-ink-secondary">{formatDate(task.finishedAt)}</td>
-                            <td className="max-w-72 px-4 py-3 text-xs text-critical">
+                            <td className={`max-w-72 px-4 py-3 text-xs ${colorDelError(task)}`}>
                               {task.error ? <span className="line-clamp-3">{task.error}</span> : "—"}
                             </td>
                             <td className="px-4 py-3">
