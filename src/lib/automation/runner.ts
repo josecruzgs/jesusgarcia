@@ -643,6 +643,16 @@ async function assertOnTargetUrl(page: Page, ctx: StepContext) {
   );
 }
 
+/** Lo mismo que assertOnTargetUrl, con el mensaje del like. */
+async function assertLikeOnTargetUrl(page: Page, ctx: StepContext) {
+  const objetivo = ctx.targetUrl;
+  if (!objetivo || rutaDePublicacion(page.url()) === rutaDePublicacion(objetivo)) return;
+  throw new Error(
+    `El navegador quedó en otra publicación (${page.url()}) en vez de la de la tarea (${objetivo}). ` +
+      "No se dio el like para no reaccionar donde no corresponde. Suele pasar en reels, que se pasan solos al siguiente video.",
+  );
+}
+
 /** Devuelve si tuvo que volver a cargar la publicación. */
 async function ensureOnTargetUrl(page: Page, ctx: StepContext) {
   const objetivo = ctx.targetUrl;
@@ -834,10 +844,10 @@ type PostLikeProbe = {
  * separa un caso del otro sobre un botón que ya sabemos cuál es —como pista
  * para encontrarlo no sirve, porque medio Facebook lo lleva.
  */
-async function markFacebookPostLike(page: Page): Promise<PostLikeProbe> {
+async function markFacebookPostLike(page: Page, soloEnPantalla = false): Promise<PostLikeProbe> {
   await defineEsbuildNameHelper(page);
   return page.evaluate(
-    ({ likeMark, likedMark, likePatterns, unlikePatterns, rowLabels, shareLabels, replyLabels, commentArticleLabels }): PostLikeProbe => {
+    ({ likeMark, likedMark, likePatterns, unlikePatterns, rowLabels, shareLabels, replyLabels, commentArticleLabels, soloEnPantalla }): PostLikeProbe => {
       // Sin acentos y en minúsculas: "Gefällt mir" y "gefallt mir" son el mismo
       // botón, y el rótulo no siempre respeta el capitalizado entre layouts.
       const normalizar = (valor: string) =>
@@ -871,8 +881,18 @@ async function markFacebookPostLike(page: Page): Promise<PostLikeProbe> {
         const rect = el.getBoundingClientRect();
         return rect.width > 0 && rect.height > 0;
       };
+      // En el visor de reels están montados también el reel anterior y los
+      // siguientes, cada uno con su columna de "Me gusta". Tienen tamaño pero
+      // están fuera de pantalla; aceptarlos era marcar el like de otro reel, y
+      // el scrollIntoView de abajo llevaba el visor hasta ese reel.
+      const enPantalla = (el: Element) => {
+        const rect = el.getBoundingClientRect();
+        return rect.bottom > 0 && rect.right > 0 && rect.top < window.innerHeight && rect.left < window.innerWidth;
+      };
       const botonesDe = (root: ParentNode) =>
-        (Array.from(root.querySelectorAll('[role="button"], button')) as HTMLElement[]).filter(visible);
+        (Array.from(root.querySelectorAll('[role="button"], button')) as HTMLElement[]).filter(
+          (el) => visible(el) && (!soloEnPantalla || enPantalla(el)),
+        );
 
       // El post abierto en dialog manda: en esa vista la página de atrás sigue
       // montada con su propio feed, y sus botones son los de otras publicaciones.
@@ -970,7 +990,13 @@ async function markFacebookPostLike(page: Page): Promise<PostLikeProbe> {
         };
       }
 
-      const candidatos = botones.filter((el) => coincide(nombreDe(el), likePatterns));
+      // El rótulo exacto ("Me gusta", "Like") primero: ante empate de puntaje
+      // gana el primero. En los reels "Reaccionar" es la flechita de al lado
+      // del pulgar, que abre el selector de emojis en vez de reaccionar.
+      const exactos = likePatterns.filter((p) => p.endsWith("$"));
+      const candidatos = botones
+        .filter((el) => coincide(nombreDe(el), likePatterns))
+        .sort((a, b) => Number(coincide(nombreDe(b), exactos)) - Number(coincide(nombreDe(a), exactos)));
       const { elegido, puntaje } = mejor(candidatos);
       if (!elegido) {
         // El detalle es para el registro de la tarea: si todos los candidatos
@@ -1015,8 +1041,20 @@ async function markFacebookPostLike(page: Page): Promise<PostLikeProbe> {
       shareLabels: FACEBOOK_SHARE_LABELS,
       replyLabels: FACEBOOK_REPLY_LABELS,
       commentArticleLabels: FACEBOOK_COMMENT_ARTICLE_LABELS,
+      soloEnPantalla,
     },
   );
+}
+
+/**
+ * Si la URL es de un visor de video vertical (reels, watch, videos).
+ *
+ * Ahí hacer scroll no baja dentro de la publicación: pasa al video siguiente.
+ * Y el DOM tiene montados varios videos a la vez, cada uno con su "Me gusta".
+ */
+function esVisorDeReels(url: string | undefined) {
+  if (!url) return false;
+  return /facebook\.com\/(reels?\/|watch|share\/[rv]\/|[^/?#]+\/videos\/)|fb\.watch\//i.test(url);
 }
 
 /**
@@ -1030,7 +1068,16 @@ async function markFacebookPostLike(page: Page): Promise<PostLikeProbe> {
 async function scrollFacebookPost(page: Page) {
   await page
     .evaluate(() => {
-      const dialog = document.querySelector('div[role="dialog"]');
+      // El dialog visible de más arriba, no el primero del DOM: Facebook deja
+      // montados dialogs vacíos u ocultos, y con el primero se terminaba
+      // bajando el feed de atrás, que es el de otras publicaciones.
+      const dialog =
+        (Array.from(document.querySelectorAll('div[role="dialog"]')) as HTMLElement[])
+          .filter((d) => {
+            const r = d.getBoundingClientRect();
+            return r.width > 0 && r.height > 0;
+          })
+          .pop() ?? null;
       const contenedores = (Array.from((dialog ?? document.body).querySelectorAll("*")) as HTMLElement[]).filter(
         (el) => {
           const estilo = getComputedStyle(el);
@@ -1060,53 +1107,212 @@ const BUSCAR_LIKE_INTENTOS = 6;
  * esperaba quince segundos un botón que estaba en otra publicación o debajo de
  * una capa.
  */
-async function prepareFacebookLike(page: Page, ctx: StepContext) {
+async function prepareFacebookLike(page: Page, ctx: StepContext): Promise<PostLikeProbe> {
   await ensureOnTargetUrl(page, ctx);
   await freezeReelPlayback(page);
   await dismissFacebookOverlays(page, ctx);
 
-  // Acá había tres atajos: si ya se veía algo que casara con el selector de
-  // "Me gusta", se daba por resuelto sin sondear. El problema es que ese
-  // selector es por `aria-label`, y ese rótulo lo llevan igual los botones de
-  // cada comentario: el atajo se cumplía con el botón de un comentario, se
-  // saltaba el sondeo, y el click terminaba reaccionando ahí.
+  // Siempre por el sondeo de fila de acciones, nunca por `aria-label` suelto.
+  // Antes se salía apenas había algún `[aria-label="Like"]` visible, y eso lo
+  // cumple también el "Me gusta" de cualquier comentario: la tarea terminaba
+  // reaccionando al primer comentario en vez de a la publicación. Lo mismo con
+  // "ya reaccionada": un comentario con like hacía creer que el post lo tenía.
   //
-  // El sondeo es el único que sabe distinguirlos —mira el ancestro, no el
-  // rótulo—, así que ahora corre siempre. Cuesta un `evaluate`, nada al lado de
-  // lo que ya se pagó cargando la página.
+  // El sondeo además baja dentro del post: la barra suele estar debajo de la
+  // imagen, y en el dialog eso es scroll interno.
   //
-  // Lo mismo valía para el atajo de "ya reaccionada": el botón de quitar la
-  // reacción de un comentario ajeno daba la tarea por hecha sin haber tocado la
-  // publicación. El sondeo también resuelve ese caso, y con el post a la vista.
-  let ultimo: PostLikeProbe | null = null;
-
+  // En reels no se hace scroll: ahí el scroll no baja dentro del post, pasa al
+  // reel siguiente, y el like terminaba en otro video. Se espera a que cargue
+  // la columna de acciones y se mira solo lo que está en pantalla.
+  const reel = esVisorDeReels(ctx.targetUrl) || esVisorDeReels(page.url());
+  let ultimo: PostLikeProbe = { status: "not_found", detail: "" };
   for (let intento = 1; intento <= BUSCAR_LIKE_INTENTOS; intento += 1) {
-    const probe = await markFacebookPostLike(page);
+    // Si algo movió el visor (autoavance, un scroll) se vuelve a la
+    // publicación antes de mirar: marcar el botón de otra es reaccionarle.
+    if (await ensureOnTargetUrl(page, ctx)) await dismissFacebookOverlays(page, ctx);
+    await freezeReelPlayback(page);
+
+    const probe = await markFacebookPostLike(page, reel);
     ultimo = probe;
 
     if (probe.status === "ready") {
       await log(ctx.taskId, "info", `Botón de reaccionar localizado por ${probe.detail}.`);
-      return;
+      return probe;
     }
     if (probe.status === "already_liked") {
       await log(ctx.taskId, "info", `La publicación ya tenía la reacción puesta (${probe.detail}).`);
-      return;
+      return probe;
     }
 
     if (intento < BUSCAR_LIKE_INTENTOS) {
-      await scrollFacebookPost(page);
-      await page.waitForTimeout(900);
+      if (!reel) await scrollFacebookPost(page);
+      await page.waitForTimeout(reel ? 1200 : 900);
     }
   }
 
-  // Ni bajando apareció. No se corta acá —el paso siguiente todavía lo intenta
-  // con el selector ancho— pero queda escrito qué se miró: sin esta línea, un
-  // like que no sale se ve en el registro como un montón de scroll y nada más,
-  // que es exactamente lo que no deja arreglarlo.
-  await log(
-    ctx.taskId,
-    "warn",
-    `No se pudo distinguir el botón de la publicación tras ${BUSCAR_LIKE_INTENTOS} intentos (${ultimo?.detail ?? "sin datos"}).`,
+  // El último scroll pudo haber cambiado de publicación sin que se mirara.
+  await ensureOnTargetUrl(page, ctx);
+  await log(ctx.taskId, "warn", `No se encontró el botón de reaccionar en la barra de acciones (${ultimo.detail}).`);
+  return ultimo;
+}
+
+const FACEBOOK_PICKER_LIKE_MARK = "data-godeye-picker-like";
+
+/** "Me encanta" en los idiomas mapeados: solo existe dentro del selector de reacciones. */
+const FACEBOOK_LOVE_LABELS = ["me encanta", "love", "j'adore", "amei", "adoro", "mi piace molto", "gefallt mir sehr", "bayildim"];
+
+/**
+ * Si está abierto el selector de reacciones (👍 ❤️ 😆 …), marca su "Me gusta".
+ *
+ * Se reconoce por "Me encanta", que fuera del selector no aparece, y el
+ * "Me gusta" que se marca es el que comparte contenedor con ese.
+ */
+async function marcarLikeEnSelectorDeReacciones(page: Page): Promise<boolean> {
+  await defineEsbuildNameHelper(page);
+  return page
+    .evaluate(
+      ({ mark, loveLabels, likePatterns }) => {
+        const normalizar = (v: string) =>
+          v.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+        for (const m of Array.from(document.querySelectorAll(`[${mark}]`))) m.removeAttribute(mark);
+        const visible = (el: Element) => {
+          const r = el.getBoundingClientRect();
+          return r.width > 0 && r.height > 0;
+        };
+        const etiquetados = (Array.from(document.querySelectorAll("[aria-label]")) as HTMLElement[]).filter(visible);
+        const loves = etiquetados.filter((el) => loveLabels.includes(normalizar(el.getAttribute("aria-label") ?? "")));
+        for (const love of loves) {
+          let nodo: HTMLElement | null = love;
+          for (let i = 0; i < 4 && nodo; i += 1) {
+            nodo = nodo.parentElement;
+            if (!nodo) break;
+            const like = (Array.from(nodo.querySelectorAll("[aria-label]")) as HTMLElement[]).find(
+              (el) =>
+                el !== love &&
+                visible(el) &&
+                likePatterns.some((p) => new RegExp(p).test(normalizar(el.getAttribute("aria-label") ?? ""))),
+            );
+            if (like) {
+              like.setAttribute(mark, "1");
+              return true;
+            }
+          }
+        }
+        return false;
+      },
+      {
+        mark: FACEBOOK_PICKER_LIKE_MARK,
+        loveLabels: FACEBOOK_LOVE_LABELS,
+        likePatterns: FACEBOOK_LIKE_ARIA_PATTERNS.filter((p) => p.endsWith("$")),
+      },
+    )
+    .catch(() => false);
+}
+
+const POST_LIKE_SELECTOR = `[${FACEBOOK_POST_LIKE_MARK}]`;
+const POST_LIKED_SELECTOR = `[${FACEBOOK_POST_LIKED_MARK}]`;
+
+/**
+ * Huella visual del botón de reaccionar marcado: rótulo, `aria-pressed` y los
+ * colores del botón y de lo que tiene adentro. Al reaccionar Facebook pinta el
+ * pulgar de azul aunque no cambie el rótulo, así que comparar la huella antes
+ * y después del click es lo que dice si la reacción quedó puesta.
+ */
+async function huellaDelLikeDelPost(page: Page): Promise<string | null> {
+  return page
+    .evaluate((mark) => {
+      const el = document.querySelector(`[${mark}]`);
+      if (!el) return null;
+      const boton = (el.closest('[role="button"], button') as Element | null) ?? el;
+      const partes = [boton.getAttribute("aria-label") ?? "", boton.getAttribute("aria-pressed") ?? ""];
+      const nodos = [boton, ...Array.from(boton.querySelectorAll("*")).slice(0, 40)];
+      for (const nodo of nodos) {
+        const estilo = getComputedStyle(nodo);
+        partes.push(estilo.color, estilo.fill, estilo.backgroundColor);
+      }
+      return partes.join("|");
+    }, FACEBOOK_POST_LIKE_MARK)
+    .catch(() => null);
+}
+
+/**
+ * Le da like a la publicación de Facebook —solo a ella— y confirma que quedó.
+ *
+ * Se clickea únicamente el botón que marcó el sondeo de fila de acciones. Si
+ * está tapado se activa ESE mismo con teclado; nunca otro "Like" de la página,
+ * que era como terminaba reaccionando a un comentario. Y la tarea solo sale
+ * por éxito si Facebook muestra la reacción puesta después del click.
+ */
+async function likeFacebookPost(page: Page, ctx: StepContext, timeoutMs: number) {
+  const reel = esVisorDeReels(ctx.targetUrl) || esVisorDeReels(page.url());
+  let probe = await prepareFacebookLike(page, ctx);
+
+  // Entre el sondeo y el click el visor de reels puede haberse pasado al
+  // siguiente video: el botón marcado ya sería el de otra publicación.
+  if (await ensureOnTargetUrl(page, ctx)) probe = await prepareFacebookLike(page, ctx);
+
+  if (probe.status === "already_liked") return;
+  if (probe.status !== "ready") {
+    throw await explicarFalloDeLike(
+      page,
+      `No se encontró el botón de reaccionar de la publicación (${probe.detail}). No se clickeó ningún otro "Me gusta" para no reaccionar a un comentario`,
+    );
+  }
+
+  await freezeReelPlayback(page);
+  await assertLikeOnTargetUrl(page, ctx);
+  const antes = await huellaDelLikeDelPost(page);
+  const target = await firstClickableLocator(page, POST_LIKE_SELECTOR, Math.min(timeoutMs, 6000)).catch(() => null);
+  if (target) {
+    await target.locator.click({ position: target.position, timeout: timeoutMs });
+  } else {
+    await log(
+      ctx.taskId,
+      "warn",
+      "El botón de like de la publicación está visible pero cubierto por otra capa; se lo activa con teclado.",
+    );
+    const fallback = await firstVisibleLocator(page, POST_LIKE_SELECTOR, 3000);
+    const boton = fallback.locator('xpath=ancestor-or-self::*[@role="button" or self::button][1]');
+    const foco = (await boton.count().catch(() => 0)) ? boton.first() : fallback;
+    await foco.focus({ timeout: 3000 });
+    await page.keyboard.press("Enter");
+  }
+
+  // Si lo que se activó fue la flechita de reacciones (o el botón abre el
+  // selector al mantenerlo), queda abierto el selector de emojis y no hay
+  // reacción puesta: se elige el 👍 de adentro.
+  await page.waitForTimeout(800);
+  if (await marcarLikeEnSelectorDeReacciones(page)) {
+    await log(ctx.taskId, "info", 'Se abrió el selector de reacciones; se elige "Me gusta" adentro.');
+    const enSelector = await firstClickableLocator(page, `[${FACEBOOK_PICKER_LIKE_MARK}]`, 3000).catch(() => null);
+    if (enSelector) await enSelector.locator.click({ position: enSelector.position, timeout: 3000 }).catch(() => {});
+  }
+
+  // Sacar el mouse y el foco de encima: el hover y el anillo de foco también
+  // cambian colores y darían por buena una reacción que no se puso.
+  await page.mouse.move(1, 1).catch(() => {});
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.()).catch(() => {});
+
+  const deadline = Date.now() + 6000;
+  while (Date.now() <= deadline) {
+    await page.waitForTimeout(700);
+    const ahora = await huellaDelLikeDelPost(page);
+    if (antes && ahora && ahora !== antes) {
+      await log(ctx.taskId, "info", "Reacción confirmada en la publicación.");
+      return;
+    }
+    // Si el visor se fue a otro reel, lo que se lea ya no es esta publicación.
+    if (ctx.targetUrl && rutaDePublicacion(page.url()) !== rutaDePublicacion(ctx.targetUrl)) break;
+    const despues = await markFacebookPostLike(page, reel);
+    if (despues.status === "already_liked") {
+      await log(ctx.taskId, "info", `Reacción confirmada en la publicación (${despues.detail}).`);
+      return;
+    }
+  }
+
+  throw new Error(
+    'Se activó el "Me gusta" de la publicación pero Facebook no mostró la reacción puesta. ' +
+      "Puede que el click no haya llegado al botón o que el perfil esté limitado para reaccionar.",
   );
 }
 
@@ -1404,8 +1610,12 @@ const FACEBOOK_COMMENT_BOX_MARKED = `[${FACEBOOK_COMMENT_BOX_MARK}]`;
  */
 async function prepareSelectorTarget(page: Page, rawSelector: string, ctx: StepContext): Promise<string | null> {
   if (ctx.taskType === "like" && isFacebookLikeSelector(rawSelector)) {
-    await prepareFacebookLike(page, ctx);
-    return null;
+    // Solo el botón marcado del post: el selector ancho por `aria-label`
+    // también agarra el "Me gusta" de los comentarios.
+    const probe = await prepareFacebookLike(page, ctx);
+    if (probe.status === "ready") return POST_LIKE_SELECTOR;
+    if (probe.status === "already_liked") return POST_LIKED_SELECTOR;
+    throw await explicarFalloDeLike(page, `No se encontró el botón de reaccionar de la publicación (${probe.detail})`);
   }
 
   if (!esTareaDeComentario(ctx.taskType) || !isFacebookCommentBoxSelector(rawSelector)) return null;
@@ -2503,6 +2713,10 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
         await likeInstagramPost(page, ctx, step.ms ?? DEFAULT_ACTION_TIMEOUT_MS);
         return;
       }
+      if (ctx.taskType === "like" && isFacebookLikeSelector(step.selector)) {
+        await likeFacebookPost(page, ctx, step.ms ?? DEFAULT_CLICK_TIMEOUT_MS);
+        return;
+      }
       {
         const timeoutMs = step.ms ?? DEFAULT_CLICK_TIMEOUT_MS;
         const selector =
@@ -2526,7 +2740,11 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
             return;
           }
 
-          const pointerBlocked = /ninguno recibe el puntero|intercepts pointer events/i.test(message);
+          // "0 visible(s)" no es un botón tapado: es que no hay nada que
+          // clickear (el paso opcional de login, por ejemplo). Tratarlo como
+          // tapado disparaba el respaldo del like sobre un selector que no era.
+          const pointerBlocked =
+            /ninguno recibe el puntero|intercepts pointer events/i.test(message) && !/\b0 visible\(s\)/.test(message);
 
           // La caja de comentario visible pero cubierta. Alcanza con enfocarla:
           // el paso `type` que viene después escribe con el teclado, que no
