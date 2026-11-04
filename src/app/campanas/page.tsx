@@ -1143,14 +1143,7 @@ Las tareas que ya se cumplieron quedan como registro.`,
                                   <button
                                     type="button"
                                     disabled={retryingId === task._id}
-                                    onClick={() => {
-                                      if (
-                                        confirm(
-                                          `¿Relanzar el like de ${task.profileId?.name ?? "este perfil"}? Úsalo si salió exitoso pero el like no quedó en la publicación. Si ya estaba puesto, la tarea lo detecta y no lo quita.`,
-                                        )
-                                      )
-                                        retryTask(task._id);
-                                    }}
+                                    onClick={() => retryTask(task._id)}
                                     title="Relanzar like (falso positivo)"
                                     aria-label="Relanzar like (falso positivo)"
                                     className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-warning/30 text-warning transition-colors hover:bg-warning/10 disabled:pointer-events-none disabled:opacity-40"

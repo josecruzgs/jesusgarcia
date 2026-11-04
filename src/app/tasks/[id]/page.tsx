@@ -81,17 +81,6 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const busy = task.status === "running" || task.status === "queued";
   const relanzar = esRelanzamientoDeLike(task);
 
-  function onRun() {
-    if (
-      relanzar &&
-      !confirm(
-        "¿Relanzar este like? Úsalo si la tarea salió exitosa pero el like no quedó en la publicación. Si ya estaba puesto, la tarea lo detecta y no lo quita.",
-      )
-    )
-      return;
-    run();
-  }
-
   return (
     <div className="flex animate-fade-in-up flex-col gap-6">
       <div>
@@ -116,7 +105,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
       {(!relanzar || esAdmin) && (
         <button
           disabled={running || busy}
-          onClick={onRun}
+          onClick={run}
           className="glow-btn inline-flex w-fit items-center gap-2 rounded bg-primary px-4 py-2 text-sm font-medium text-primary-fg transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50"
         >
           {busy ? (
