@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { ApiError, apiFetch } from "@/lib/api";
 import { useSession } from "@/lib/session";
+import { esRelanzamientoDeLike } from "@/lib/tasks/relanzar";
 import Card from "@/components/Card";
 import Motores from "@/components/Motores";
 import ElementIcon from "@/components/ui/ElementIcon";
@@ -1128,6 +1129,31 @@ Las tareas que ya se cumplieron quedan como registro.`,
                                         : "Encolar esta tarea ahora"
                                     }
                                     className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-hairline text-ink-muted transition-colors hover:bg-page hover:text-ink disabled:pointer-events-none disabled:opacity-40"
+                                  >
+                                    <RotateCcw
+                                      className={`h-4 w-4 ${retryingId === task._id ? "animate-spin" : ""}`}
+                                    />
+                                  </button>
+                                )}
+                                {/* Like "exitoso" que en realidad no quedó (falso
+                                    positivo): solo un admin lo relanza, de a uno,
+                                    después de revisar la publicación. La API
+                                    rechaza a los demás. */}
+                                {esAdmin && esRelanzamientoDeLike(task) && (
+                                  <button
+                                    type="button"
+                                    disabled={retryingId === task._id}
+                                    onClick={() => {
+                                      if (
+                                        confirm(
+                                          `¿Relanzar el like de ${task.profileId?.name ?? "este perfil"}? Úsalo si salió exitoso pero el like no quedó en la publicación. Si ya estaba puesto, la tarea lo detecta y no lo quita.`,
+                                        )
+                                      )
+                                        retryTask(task._id);
+                                    }}
+                                    title="Relanzar like (falso positivo)"
+                                    aria-label="Relanzar like (falso positivo)"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-warning/30 text-warning transition-colors hover:bg-warning/10 disabled:pointer-events-none disabled:opacity-40"
                                   >
                                     <RotateCcw
                                       className={`h-4 w-4 ${retryingId === task._id ? "animate-spin" : ""}`}
