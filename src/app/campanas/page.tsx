@@ -204,6 +204,7 @@ function CampaignsContent() {
   const [taskFilter, setTaskFilter] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [retryingBulk, setRetryingBulk] = useState(false);
+  const [retryingSuccess, setRetryingSuccess] = useState(false);
   const [deletingProfileId, setDeletingProfileId] = useState<string | null>(null);
   // Lo que salió bien. Va aparte de `error` porque eliminar un perfil borra
   // tareas de otras campañas: decir cuántas fueron es la única forma de que se
@@ -474,6 +475,34 @@ Las tareas que ya se cumplieron quedan como registro.`,
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setDeletingProfileId(null);
+    }
+  }
+
+  /**
+   * Relanza todas las exitosas de una campaña de likes, para corregir falsos
+   * positivos de una vez. Solo admin (la API lo exige). Es seguro: si el like
+   * ya estaba puesto, la tarea lo detecta y no lo quita.
+   */
+  async function relaunchAllSuccess() {
+    if (!selectedId || !selectedCampaign) return;
+    const total = selectedCampaign.counts.success;
+    if (!confirm(`¿Relanzar ${total} ${total === 1 ? "like exitoso" : "likes exitosos"}? Los que ya estaban puestos no se tocan.`)) return;
+
+    setRetryingSuccess(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const { queuedCount } = await apiFetch<{ queuedCount: number }>(`/api/campaigns/${selectedId}/run`, {
+        method: "POST",
+        body: JSON.stringify({ status: "success" }),
+      });
+      setNotice(`${queuedCount} ${queuedCount === 1 ? "like relanzado" : "likes relanzados"}.`);
+      await Promise.all([load(), loadCampaign(selectedId, true)]);
+      setTaskFilter("queued");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRetryingSuccess(false);
     }
   }
 
@@ -935,6 +964,18 @@ Las tareas que ya se cumplieron quedan como registro.`,
                   >
                     <RotateCcw className={`h-4 w-4 ${retryingBulk ? "animate-spin" : ""}`} />
                     {retryingBulk ? "Relanzando..." : `Relanzar fallidas (${selectedCampaign?.counts.failed ?? 0})`}
+                  </button>
+                )}
+                {esAdmin && selectedCampaign?.type === "like" && (
+                  <button
+                    type="button"
+                    disabled={!selectedCampaign.counts.success || retryingSuccess}
+                    onClick={relaunchAllSuccess}
+                    title="Relanzar los likes exitosos para corregir falsos positivos (los que ya estaban puestos no se tocan)"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-warning/30 bg-page px-3 py-2 text-sm font-medium text-warning transition-colors hover:bg-warning/10 disabled:pointer-events-none disabled:opacity-40"
+                  >
+                    <RotateCcw className={`h-4 w-4 ${retryingSuccess ? "animate-spin" : ""}`} />
+                    {retryingSuccess ? "Relanzando..." : `Relanzar exitosas (${selectedCampaign.counts.success})`}
                   </button>
                 )}
                 {pausedInDetail > 0 ? (
