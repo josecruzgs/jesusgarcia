@@ -2,8 +2,10 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Play, Loader2 } from "lucide-react";
+import { ArrowLeft, Play, Loader2, RotateCcw } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { useSession } from "@/lib/session";
+import { esRelanzamientoDeLike } from "@/lib/tasks/relanzar";
 import StatusBadge from "@/components/StatusBadge";
 import Card from "@/components/Card";
 
@@ -35,6 +37,7 @@ const LOG_COLOR: Record<Log["level"], string> = {
 
 export default function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const esAdmin = useSession()?.role === "admin";
 
   const [task, setTask] = useState<Task | null>(null);
   const [logs, setLogs] = useState<Log[]>([]);
@@ -76,6 +79,18 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   }
 
   const busy = task.status === "running" || task.status === "queued";
+  const relanzar = esRelanzamientoDeLike(task);
+
+  function onRun() {
+    if (
+      relanzar &&
+      !confirm(
+        "¿Relanzar este like? Úsalo si la tarea salió exitosa pero el like no quedó en la publicación. Si ya estaba puesto, la tarea lo detecta y no lo quita.",
+      )
+    )
+      return;
+    run();
+  }
 
   return (
     <div className="flex animate-fade-in-up flex-col gap-6">
@@ -97,14 +112,23 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
         <p className="rounded-lg bg-critical/10 p-3 text-sm text-critical">Último error: {task.error}</p>
       )}
 
-      <button
-        disabled={running || busy}
-        onClick={run}
-        className="glow-btn inline-flex w-fit items-center gap-2 rounded bg-primary px-4 py-2 text-sm font-medium text-primary-fg transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50"
-      >
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-        {busy ? "En proceso..." : "Ejecutar ahora"}
-      </button>
+      {/* Un like exitoso solo lo relanza un admin (la API lo exige). */}
+      {(!relanzar || esAdmin) && (
+        <button
+          disabled={running || busy}
+          onClick={onRun}
+          className="glow-btn inline-flex w-fit items-center gap-2 rounded bg-primary px-4 py-2 text-sm font-medium text-primary-fg transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50"
+        >
+          {busy ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : relanzar ? (
+            <RotateCcw className="h-4 w-4" />
+          ) : (
+            <Play className="h-4 w-4" />
+          )}
+          {busy ? "En proceso..." : relanzar ? "Relanzar like" : "Ejecutar ahora"}
+        </button>
+      )}
 
       <Card className="p-4">
         <h2 className="mb-2 text-sm font-semibold text-ink">Steps</h2>
