@@ -423,6 +423,13 @@ function normalizePageText(value: string) {
     .toLowerCase();
 }
 
+/**
+ * El error de una tarea cuyo perfil no tiene sesión de Facebook. Dice
+ * "no logeado" y no "cerró la sesión" para que no se lea como que se cerró
+ * la cuenta.
+ */
+const USUARIO_NO_LOGEADO = "Usuario no logeado";
+
 async function knownFacebookBlocker(page: Page): Promise<string | null> {
   const url = page.url();
   if (!url.includes("facebook.com")) return null;
@@ -436,6 +443,10 @@ async function knownFacebookBlocker(page: Page): Promise<string | null> {
 
   for (const blocker of FACEBOOK_BLOCKERS) {
     if (blocker.text.some((pattern) => bodyText.includes(pattern) || normalizedUrl.includes(pattern))) {
+      // La pantalla de login no es un bloqueo de la cuenta: el perfil solo
+      // perdió la sesión. "Facebook detuvo este perfil" además hace que la
+      // pantalla de campañas ofrezca eliminarlo.
+      if (blocker.label === "sesion requerida") return USUARIO_NO_LOGEADO;
       return `Facebook detuvo este perfil por ${blocker.label}. Requiere accion manual en la cuenta antes de volver a usarla.`;
     }
   }
@@ -1708,7 +1719,7 @@ async function prepareSelectorTarget(page: Page, rawSelector: string, ctx: StepC
         target = await firstClickableLocator(page, abrir, 2500);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        if (message.startsWith("Facebook detuvo este perfil")) throw err;
+        if (message.startsWith("Facebook detuvo este perfil") || message.startsWith(USUARIO_NO_LOGEADO)) throw err;
       }
     }
 
@@ -2710,6 +2721,55 @@ async function followFacebookProfile(page: Page, ctx: StepContext) {
   );
 }
 
+/**
+ * La sesión de Facebook se cayó y no se pudo recuperar.
+ *
+ * Tiene clase propia porque el paso que la detecta es opcional, y un error de
+ * paso opcional se traga: esta tiene que cortar la tarea igual. El mensaje no
+ * empieza con "Facebook detuvo este perfil" a propósito, para que la pantalla
+ * de campañas no ofrezca eliminar el perfil — esto se arregla volviendo a
+ * iniciar sesión, no tirando la cuenta.
+ */
+class SesionCaidaError extends Error {}
+
+const FACEBOOK_LOGIN_SUBMIT_SELECTOR = 'button[name="login"]';
+
+/**
+ * Si el perfil tiene sesión de Facebook, mirando la cookie `c_user`.
+ *
+ * La cookie no depende del idioma, a diferencia de cualquier texto de la
+ * página. Si no se pueden leer las cookies se da por logueado, para no frenar
+ * tareas por un fallo nuestro.
+ */
+async function hasFacebookSession(page: Page) {
+  try {
+    const cookies = await page.context().cookies("https://www.facebook.com");
+    return cookies.some((c) => c.name === "c_user" && c.value);
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * El paso `button[name="login"]` de `loginIfNeededSteps`, hecho bien.
+ *
+ * Antes clickeaba el botón del formulario clásico, que Facebook ya casi no
+ * muestra: el paso "no aplicaba" y la tarea seguía como si hubiera sesión,
+ * hasta morir con un timeout que no decía nada de la sesión.
+ *
+ * Ahora: si hay sesión (cookie `c_user`), nada. Si no, corta la tarea con un
+ * mensaje que dice lo que pasa.
+ */
+async function ensureFacebookSession(page: Page) {
+  if (await hasFacebookSession(page)) return;
+  // No se intenta volver a entrar: sin sesión Facebook pide 2FA, y mandar el
+  // formulario desde la IP del proxy solo suma intentos de login sospechosos
+  // a la cuenta. Se corta la tarea; los demás bloqueos (checkpoint, cuenta
+  // bloqueada) se informan con su propio mensaje.
+  await assertNoKnownBlocker(page);
+  throw new SesionCaidaError(USUARIO_NO_LOGEADO);
+}
+
 async function runStep(page: Page, step: Step, ctx: StepContext) {
   switch (step.action) {
     case "goto":
@@ -2720,6 +2780,12 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
       if (!step.selector) throw new Error("Step 'click' requiere 'selector'");
       if (esLikeDeInstagram(page, step.selector, ctx)) {
         await likeInstagramPost(page, ctx, step.ms ?? DEFAULT_ACTION_TIMEOUT_MS);
+        return;
+      }
+      // El paso de login de loginIfNeededSteps: en Facebook se resuelve por
+      // cookie de sesión y con todas las pantallas de login, no solo la clásica.
+      if (step.selector === FACEBOOK_LOGIN_SUBMIT_SELECTOR && page.url().includes("facebook.com")) {
+        await ensureFacebookSession(page);
         return;
       }
       if (ctx.taskType === "like" && isFacebookLikeSelector(step.selector)) {
@@ -3287,7 +3353,7 @@ export async function runTask(taskId: string) {
         // siempre: la tarea se abortaba con el comentario ya escrito.
         if (s.action === "goto") targetUrl = page.url();
       } catch (err) {
-        if (!s.optional) throw err;
+        if (!s.optional || err instanceof SesionCaidaError) throw err;
         const message = err instanceof Error ? err.message : String(err);
         await log(taskId, "warn", `Step opcional ${i + 1} no aplicó, se continúa: ${message}`);
       }
