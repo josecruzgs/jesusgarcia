@@ -65,7 +65,7 @@ const ADVANCE_LABELS = [
 const DIALOG_ROUNDS = 4;
 const STATE_TIMEOUT_MS = 15000;
 
-type JoinState = "join" | "pending" | "member" | "unknown";
+export type JoinState = "join" | "pending" | "member" | "unknown";
 
 type FormControl = {
   id: string;
@@ -142,7 +142,7 @@ export async function leerNombreGrupo(page: Page): Promise<string> {
  * unirse si lo hay. Se toma el primero en orden de documento: el del encabezado
  * del grupo va antes que los "Unirte" de los grupos sugeridos de la columna.
  */
-async function leerEstado(page: Page): Promise<JoinState> {
+export async function leerEstado(page: Page): Promise<JoinState> {
   await definirNameHelper(page);
   return page.evaluate(
     ({ join, pending, member, mark }) => {

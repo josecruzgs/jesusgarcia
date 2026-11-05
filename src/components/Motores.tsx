@@ -38,6 +38,7 @@ const TYPE_LABELS: Record<string, string> = {
   login: "Login",
   ramificacion: "Ramificación",
   joingroup: "Unirse a grupo",
+  grouppost: "Publicar en grupo",
   follow: "Seguir perfil",
   custom: "Personalizada",
 };

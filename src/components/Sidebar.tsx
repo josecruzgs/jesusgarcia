@@ -31,6 +31,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   type LucideIcon,
+  Newspaper,
 } from "lucide-react";
 import { useSession } from "@/lib/session";
 import { normalizeHex, sidebarStyle } from "@/lib/theme";
@@ -81,6 +82,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/tasks/comment", label: "Comentar", icon: MessageSquare },
       { href: "/tasks/ramificacion", label: "Ramificaciones", icon: GitBranch },
       { href: "/tasks/unirse-grupo", label: "Unirse a grupos", icon: UsersRound },
+      { href: "/tasks/publicar-grupo", label: "Publicar en grupos", icon: Newspaper },
       { href: "/tasks/follow", label: "Seguir perfiles", icon: UserPlus },
       { href: "/tasks/post", label: "Publicar", icon: Megaphone },
     ],

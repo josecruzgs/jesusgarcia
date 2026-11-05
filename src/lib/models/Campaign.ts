@@ -37,6 +37,7 @@ if (
   (!cachedTypes?.includes("likecomment") ||
     !cachedTypes?.includes("ramificacion") ||
     !cachedTypes?.includes("joingroup") ||
+    !cachedTypes?.includes("grouppost") ||
     !cachedTypes?.includes("follow") ||
     !cachedCampaignSchema?.path("ownerId") ||
     !cachedCampaignSchema?.path("stopReason"))

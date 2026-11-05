@@ -8,6 +8,8 @@ import ProfileModel from "@/lib/models/Profile";
 import { connectToProfile, disconnectProfile } from "./browser";
 import { parseFacebookCommentTarget } from "@/lib/commentLinks";
 import { leerNombreGrupo, unirseAlGrupo, type JoinGroupResult, type Persona } from "./groupJoin";
+import { publicarEnGrupo } from "./groupPost";
+import GroupPostImageModel from "@/lib/models/GroupPostImage";
 import {
   INSTAGRAM_COMMENT_BOX_SELECTOR,
   INSTAGRAM_COMMENT_OPEN_SELECTOR,
@@ -33,7 +35,8 @@ type Step = {
     | "replyComment"
     | "joinGroup"
     | "followProfile"
-    | "readGroupName";
+    | "readGroupName"
+    | "groupPost";
   selector?: string;
   value?: string;
   url?: string;
@@ -48,6 +51,8 @@ type Step = {
    * de ejecutar. Ver Ramificaciones.
    */
   fromParent?: boolean;
+  /** Para "groupPost": la imagen a adjuntar (GroupPostImage). */
+  imageId?: string;
   // Si el step falla (ej. un selector que no siempre aparece, como un
   // interstitial de "una sola vez"), se loguea como advertencia y la tarea
   // sigue en vez de terminar en "failed".
@@ -2478,7 +2483,7 @@ async function waitForPublishedComment(
  * respuesta cuando vienen.
  */
 type ConfirmacionDeEnvio =
-  | { ok: true; id: string | null; url: string | null; perfilUrl: string | null }
+  | { ok: true; id: string | null; url: string | null; perfilUrl: string | null; cuerpo: string }
   | { ok: false; error: string };
 
 type EnvioComentario = {
@@ -2556,7 +2561,7 @@ function vigilarEnvioComentario(page: Page, texto: string): EnvioComentario {
     const creado =
       response.status() < 400 && !/"status"\s*:\s*"fail"/.test(cuerpo) && normalizar(cuerpo).includes(buscado);
     if (creado) {
-      terminar({ ok: true, ...datosDelComentarioCreado(cuerpo, page.url()) });
+      terminar({ ok: true, ...datosDelComentarioCreado(cuerpo, page.url()), cuerpo });
       return;
     }
     const rechazo = rechazoDeLaRed(response.status(), cuerpo);
@@ -2579,6 +2584,17 @@ function desescaparJson(valor: string) {
   return valor
     .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)))
     .replace(/\\\//g, "/");
+}
+
+/**
+ * El permalink de una publicación recién creada en un grupo, de la respuesta
+ * del servidor. Se exige la forma de publicación (`/groups/<id>/posts/<id>` o
+ * `/permalink/`): la respuesta trae también el link del grupo y del autor, y
+ * guardar uno de esos como "la publicación" sería un enlace engañoso.
+ */
+function urlDePublicacionDeGrupo(cuerpo: string): string | null {
+  const m = cuerpo.match(/https:\/\/www\.facebook\.com\/groups\/[^"\s]+?\/(?:posts|permalink)\/\d+\/?/);
+  return m ? m[0] : null;
 }
 
 /** El motivo, si la respuesta es un rechazo explícito del comentario. */
@@ -3544,6 +3560,49 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
         assertNoBlocker: () => assertNoKnownBlocker(page),
       });
       ctx.onJoinState?.(estado);
+      return;
+    }
+    case "groupPost": {
+      const texto = step.value?.trim();
+      if (!texto) throw new Error("Step 'groupPost' requiere 'value' con el texto a publicar");
+
+      let imagen = null;
+      if (step.imageId) {
+        const doc = await GroupPostImageModel.findById(step.imageId);
+        if (!doc) throw new Error("La imagen de esta publicación ya no existe; vuelve a subirla y relanza la tarea.");
+        imagen = { name: doc.name, mimeType: doc.mimeType, buffer: Buffer.from(doc.data) };
+      }
+
+      // Mismo criterio que con los comentarios: lo que confirma la
+      // publicación es la respuesta del servidor, no que el diálogo se cierre.
+      let envio: EnvioComentario | undefined;
+      const resultado = await publicarEnGrupo(page, {
+        texto,
+        imagen,
+        log: (level, message) => log(ctx.taskId, level, message),
+        assertNoBlocker: () => assertNoKnownBlocker(page),
+        antesDePublicar: () => {
+          envio = vigilarEnvioComentario(page, texto);
+        },
+      });
+
+      const confirmacion = envio ? await (envio as EnvioComentario).esperar(20000) : null;
+      (envio as EnvioComentario | undefined)?.cancelar();
+      if (confirmacion && !confirmacion.ok) {
+        throw new Error(`Facebook rechazó la publicación: ${confirmacion.error}`);
+      }
+
+      const url = confirmacion?.ok ? urlDePublicacionDeGrupo(confirmacion.cuerpo) : null;
+      if (url) ctx.onResult?.({ url, perfilUrl: null });
+
+      const aprobacion = resultado.pendienteDeAprobacion ? " Queda pendiente de aprobación de los admins del grupo." : "";
+      await log(
+        ctx.taskId,
+        confirmacion?.ok ? "info" : "warn",
+        confirmacion?.ok
+          ? `Publicación creada: Facebook confirmó el envío${url ? ` (${url})` : ""}.${aprobacion}`
+          : `El diálogo se envió y se cerró, pero no se detectó la confirmación del servidor.${aprobacion} POST vistos: ${(envio as EnvioComentario | undefined)?.vistos.join(", ") || "(ninguno)"}`,
+      );
       return;
     }
     case "readGroupName": {

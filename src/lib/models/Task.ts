@@ -25,6 +25,7 @@ const StepSchema = new Schema(
         "joinGroup",
         "followProfile",
         "readGroupName",
+        "groupPost",
       ],
       required: true,
     },
@@ -42,6 +43,8 @@ const StepSchema = new Schema(
     // Ramificaciones: el commentId (y la url del goto) salen del comentario que
     // publicó la tarea padre, que al crear la campaña todavía no existe.
     fromParent: { type: Boolean },
+    // Solo para "groupPost": la imagen a adjuntar (ver GroupPostImage).
+    imageId: { type: String },
   },
   { _id: false },
 );
@@ -56,6 +59,7 @@ export const TASK_TYPES = [
   "comment",
   "ramificacion",
   "joingroup",
+  "grouppost",
   "follow",
   "custom",
 ] as const;
@@ -149,10 +153,12 @@ function isStaleTaskModel() {
     !types.includes("likecomment") ||
     !types.includes("ramificacion") ||
     !types.includes("joingroup") ||
+    !types.includes("grouppost") ||
     !types.includes("follow") ||
     !actions.includes("joinGroup") ||
     !actions.includes("followProfile") ||
-    !actions.includes("readGroupName")
+    !actions.includes("readGroupName") ||
+    !actions.includes("groupPost")
   );
 }
 

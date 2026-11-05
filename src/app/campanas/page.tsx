@@ -84,13 +84,14 @@ type DeleteProfileResult = {
 
 const PAGE_SIZE = 20;
 const STATUSES = ["pending", "queued", "running", "paused", "success", "failed", "partial", "cancelled", "empty"];
-const TYPES = ["like", "likecomment", "comment", "joingroup", "follow", "post", "warmup", "scrape", "custom"];
+const TYPES = ["like", "likecomment", "comment", "joingroup", "grouppost", "follow", "post", "warmup", "scrape", "custom"];
 
 const TYPE_LABELS: Record<string, string> = {
   like: "Likes",
   likecomment: "Likes a comentarios",
   comment: "Comentarios",
   joingroup: "Unirse a grupos",
+  grouppost: "Publicar en grupos",
   follow: "Seguir perfiles",
   post: "Publicaciones",
   warmup: "Warmup",
@@ -164,6 +165,7 @@ const TYPE_ROUTES: Record<string, string> = {
   likecomment: "/tasks/likecomment",
   comment: "/tasks/comment",
   joingroup: "/tasks/unirse-grupo",
+  grouppost: "/tasks/publicar-grupo",
   follow: "/tasks/follow",
   post: "/tasks/post",
   warmup: "/tasks/warmup",
