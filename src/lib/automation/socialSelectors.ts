@@ -51,6 +51,58 @@ export const FACEBOOK_COMMENT_BOX_SELECTOR = [
   'form div[role="textbox"][contenteditable="true"]',
 ].join(", ");
 
+/**
+ * La caja de comentario de Instagram.
+ *
+ * Iba con el rótulo exacto ("Add a comment…") y eso falla por tres motivos que
+ * se dan a la vez: el perfil puede tener la interfaz en español ("Añade un
+ * comentario…", "Agrega un comentario…"), los puntos suspensivos son a veces el
+ * carácter "…" y a veces tres puntos sueltos, e Instagram convive con dos
+ * composers —el <textarea> de siempre y un div contenteditable en los builds
+ * nuevos—. Cualquiera de las tres diferencias dejaba "0 match(es)" y la tarea
+ * moría esperando una caja que sí estaba en pantalla.
+ *
+ * Por eso se matchea por subcadena e ignorando mayúsculas: alcanza con que el
+ * rótulo contenga "comment" o "comentario".
+ */
+export const INSTAGRAM_COMMENT_BOX_SELECTOR = [
+  'textarea[aria-label*="comment" i]',
+  'textarea[aria-label*="comentario" i]',
+  'textarea[placeholder*="comment" i]',
+  'textarea[placeholder*="comentario" i]',
+  'div[role="textbox"][contenteditable="true"][aria-label*="comment" i]',
+  'div[role="textbox"][contenteditable="true"][aria-label*="comentario" i]',
+  'div[role="textbox"][contenteditable="true"][aria-placeholder*="comment" i]',
+  'div[role="textbox"][contenteditable="true"][aria-placeholder*="comentario" i]',
+  // El composer de Instagram es el único textarea dentro de un form en la
+  // página de una publicación; queda de red por si vuelven a renombrar el rótulo.
+  "form textarea",
+].join(", ");
+
+/**
+ * El botón que abre los comentarios en Instagram.
+ *
+ * En una publicación abierta el composer ya está montado, pero en el visor de
+ * reels y en la vista de video hay que abrir el panel primero.
+ */
+export const INSTAGRAM_COMMENT_OPEN_SELECTOR = selectorForAriaLabels([
+  "Comment",
+  "Comentar",
+  "Comentario",
+]);
+
+/** Capas que Instagram monta encima de la publicación y tapan el composer. */
+export const INSTAGRAM_DISMISS_SELECTOR = [
+  'div[role="dialog"] [aria-label="Close"]',
+  'div[role="dialog"] [aria-label="Cerrar"]',
+  'div[role="dialog"] svg[aria-label="Close"]',
+  'div[role="dialog"] svg[aria-label="Cerrar"]',
+  'div[role="dialog"] button:has-text("Ahora no")',
+  'div[role="dialog"] button:has-text("Not Now")',
+  'button:has-text("Ahora no")',
+  'button:has-text("Not Now")',
+].join(", ");
+
 /** Presets del botón de reacción, por plataforma. */
 export const REACTION_PRESETS: Record<string, { label: string; selector: string }> = {
   facebook: { label: "Facebook", selector: FACEBOOK_REACTION_TRIGGER_SELECTOR },
@@ -77,7 +129,7 @@ export const COMMENT_PRESETS: Record<string, CommentPreset> = {
   },
   instagram: {
     label: "Instagram",
-    selector: 'textarea[aria-label="Add a comment…"], textarea[aria-label="Añade un comentario..."]',
+    selector: INSTAGRAM_COMMENT_BOX_SELECTOR,
     submitMethod: "enter",
     submitSelector: "",
   },
