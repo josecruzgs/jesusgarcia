@@ -6,9 +6,9 @@ import TaskModel from "@/lib/models/Task";
 // cargó /api/profiles antes.
 import "@/lib/models/Profile";
 import { withAuth } from "@/lib/apiHandler";
+import { filtroDeTareas } from "@/lib/tasks/filtroDeTareas";
 import { findUsableProfile } from "@/lib/auth/profiles";
-import { ownerNames, visibleOwnerFilter } from "@/lib/auth/dal";
-import { escapeRegex } from "@/lib/regex";
+import { ownerNames } from "@/lib/auth/dal";
 
 export const GET = withAuth(async (user, req: NextRequest) => {
   const sp = req.nextUrl.searchParams;
@@ -21,11 +21,7 @@ export const GET = withAuth(async (user, req: NextRequest) => {
 
   await dbConnect();
 
-  const filter: Record<string, unknown> = { ...visibleOwnerFilter(user) };
-  if (status) filter.status = status;
-  if (type) filter.type = type;
-  if (profileId) filter.profileId = profileId;
-  if (search) filter.name = { $regex: escapeRegex(search), $options: "i" };
+  const filter = filtroDeTareas(user, { status, type, profileId, search });
 
   const [docs, total] = await Promise.all([
     TaskModel.find(filter)

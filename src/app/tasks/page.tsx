@@ -18,6 +18,8 @@ import {
   UsersRound,
   UserPlus,
   RotateCcw,
+  Ban,
+  Trash2,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useSession } from "@/lib/session";
@@ -105,6 +107,16 @@ function TasksContent() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [stopping, setStopping] = useState(false);
 
+  // Selección para las acciones masivas. `todas` es "todas las que coinciden
+  // con los filtros", no solo las de esta página: ahí no se mandan ids sino
+  // los filtros, y el servidor resuelve el mismo conjunto que está contando.
+  const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
+  const [todas, setTodas] = useState(false);
+  const [masivaEnCurso, setMasivaEnCurso] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
+  // Esta instalación no tiene rol de solo lectura: todos pueden editar.
+  const puedeEditar = true;
+
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState(initialStatus);
@@ -124,6 +136,13 @@ function TasksContent() {
     }, 300);
     return () => clearTimeout(t);
   }, [searchInput]);
+
+  // Cambiar un filtro cambia qué es "lo seleccionado": se arranca de cero en
+  // vez de arrastrar casillas de tareas que ya no están en la tabla.
+  useEffect(() => {
+    setSeleccion(new Set());
+    setTodas(false);
+  }, [status, type, profileId, search]);
 
   async function load() {
     setLoading(true);
@@ -211,6 +230,74 @@ function TasksContent() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setStopping(false);
+    }
+  }
+
+  const idsDePagina = tasks.map((t) => t._id);
+  const paginaEntera = idsDePagina.length > 0 && idsDePagina.every((id) => seleccion.has(id));
+  const paginaParcial = !paginaEntera && idsDePagina.some((id) => seleccion.has(id));
+  const cantidadSeleccionada = todas ? total : seleccion.size;
+
+  function alternar(id: string) {
+    setTodas(false);
+    setSeleccion((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function alternarPagina() {
+    setTodas(false);
+    setSeleccion((prev) => {
+      const next = new Set(prev);
+      if (paginaEntera) idsDePagina.forEach((id) => next.delete(id));
+      else idsDePagina.forEach((id) => next.add(id));
+      return next;
+    });
+  }
+
+  function limpiarSeleccion() {
+    setSeleccion(new Set());
+    setTodas(false);
+  }
+
+  const ACCIONES_MASIVAS = {
+    run: { verbo: "relanzar", hecho: "relanzaron", saltoPorque: "ya estaban en cola o corriendo" },
+    cancel: { verbo: "cancelar", hecho: "cancelaron", saltoPorque: "ya habían arrancado o terminado" },
+    delete: { verbo: "eliminar", hecho: "eliminaron", saltoPorque: "están corriendo" },
+  } as const;
+
+  async function accionMasiva(action: keyof typeof ACCIONES_MASIVAS) {
+    const { verbo, hecho, saltoPorque } = ACCIONES_MASIVAS[action];
+    const n = cantidadSeleccionada;
+    const cuales = todas ? `las ${n} tareas que coinciden con los filtros` : `${n} tarea${n === 1 ? "" : "s"} seleccionada${n === 1 ? "" : "s"}`;
+    const extra = action === "delete" ? " Se borran también sus logs y no se puede deshacer." : "";
+    if (!confirm(`¿${verbo[0].toUpperCase()}${verbo.slice(1)} ${cuales}?${extra}`)) return;
+
+    setMasivaEnCurso(true);
+    setError(null);
+    setAviso(null);
+    try {
+      const body = todas
+        ? { action, filters: { status, type, profileId, search } }
+        : { action, ids: Array.from(seleccion) };
+      const { afectadas, saltadas } = await apiFetch<{ afectadas: number; saltadas: number }>("/api/tasks/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      setAviso(
+        `Se ${hecho} ${afectadas} tarea${afectadas === 1 ? "" : "s"}.` +
+          (saltadas ? ` ${saltadas} se saltaron porque ${saltoPorque}${action === "run" && !esAdmin ? " (o son likes exitosos, que solo relanza un admin)" : ""}.` : ""),
+      );
+      limpiarSeleccion();
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setMasivaEnCurso(false);
     }
   }
 
@@ -345,11 +432,91 @@ function TasksContent() {
         )}
       </Card>
 
+      {aviso && (
+        <p className="flex items-start justify-between gap-3 rounded-xl bg-primary/10 p-3 text-sm text-ink">
+          {aviso}
+          <button type="button" onClick={() => setAviso(null)} className="text-xs text-ink-muted underline hover:text-ink">
+            Cerrar
+          </button>
+        </p>
+      )}
+
+      {puedeEditar && cantidadSeleccionada > 0 && (
+        <Card className="sticky top-2 z-10 flex flex-wrap items-center gap-2 border-primary/40 p-3 shadow-md">
+          <span className="text-sm font-medium text-ink">
+            {todas
+              ? `Las ${total} tareas que coinciden con los filtros`
+              : `${cantidadSeleccionada} seleccionada${cantidadSeleccionada === 1 ? "" : "s"}`}
+          </span>
+          {/* Con la página entera marcada y más páginas detrás, se ofrece
+              ampliar a todas las que coinciden: es el caso de "borrar las 300
+              fallidas" sin tener que ir página por página. */}
+          {!todas && paginaEntera && total > tasks.length && (
+            <button
+              type="button"
+              onClick={() => setTodas(true)}
+              className="text-xs font-medium text-primary underline hover:no-underline"
+            >
+              Seleccionar las {total} que coinciden con los filtros
+            </button>
+          )}
+          <div className="ml-auto flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={masivaEnCurso}
+              onClick={() => accionMasiva("run")}
+              className="inline-flex items-center gap-1 rounded-lg border border-hairline px-2.5 py-1 text-xs font-medium transition-colors hover:bg-page disabled:opacity-40"
+            >
+              <RotateCcw className="h-3 w-3" /> Relanzar
+            </button>
+            <button
+              type="button"
+              disabled={masivaEnCurso}
+              onClick={() => accionMasiva("cancel")}
+              className="inline-flex items-center gap-1 rounded-lg border border-warning/30 px-2.5 py-1 text-xs font-medium text-warning transition-colors hover:bg-warning/10 disabled:opacity-40"
+            >
+              <Ban className="h-3 w-3" /> Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={masivaEnCurso}
+              onClick={() => accionMasiva("delete")}
+              className="inline-flex items-center gap-1 rounded-lg border border-critical/20 px-2.5 py-1 text-xs font-medium text-critical transition-colors hover:bg-critical/10 disabled:opacity-40"
+            >
+              <Trash2 className="h-3 w-3" /> Eliminar
+            </button>
+            <button
+              type="button"
+              disabled={masivaEnCurso}
+              onClick={limpiarSeleccion}
+              className="rounded-lg px-2.5 py-1 text-xs font-medium text-ink-muted transition-colors hover:text-ink disabled:opacity-40"
+            >
+              Quitar selección
+            </button>
+          </div>
+        </Card>
+      )}
+
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b border-hairline text-left text-xs uppercase tracking-wide text-ink-muted">
               <tr>
+                {puedeEditar && (
+                  <th className="w-10 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      aria-label="Seleccionar todas las de esta página"
+                      checked={todas || paginaEntera}
+                      ref={(el) => {
+                        if (el) el.indeterminate = !todas && paginaParcial;
+                      }}
+                      onChange={() => (todas ? limpiarSeleccion() : alternarPagina())}
+                      disabled={!tasks.length}
+                      className="h-4 w-4 cursor-pointer accent-primary"
+                    />
+                  </th>
+                )}
                 <th className="px-4 py-3 font-medium">Nombre</th>
                 <th className="px-4 py-3 font-medium">Perfil</th>
                 <th className="px-4 py-3 font-medium">Tipo</th>
@@ -361,17 +528,40 @@ function TasksContent() {
             <tbody>
               {loading && tasks.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-ink-muted">Cargando...</td>
+                  <td colSpan={6 + (puedeEditar ? 1 : 0)} className="px-4 py-10 text-center text-ink-muted">Cargando...</td>
                 </tr>
               ) : tasks.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-ink-muted">Sin tareas que coincidan.</td>
+                  <td colSpan={6 + (puedeEditar ? 1 : 0)} className="px-4 py-10 text-center text-ink-muted">Sin tareas que coincidan.</td>
                 </tr>
               ) : (
                 tasks.map((t) => {
                   const enlaces = enlacesDeLaTarea(t);
                   return (
-                  <tr key={t._id} className="border-t border-hairline transition-colors hover:bg-page/60">
+                  <tr
+                    key={t._id}
+                    className={`border-t border-hairline transition-colors hover:bg-page/60 ${
+                      todas || seleccion.has(t._id) ? "bg-primary/5" : ""
+                    }`}
+                  >
+                    {puedeEditar && (
+                      <td className="w-10 px-4 py-3">
+                        <input
+                          type="checkbox"
+                          aria-label={`Seleccionar ${t.name}`}
+                          checked={todas || seleccion.has(t._id)}
+                          onChange={() => {
+                            // Desmarcar una fila con "todas" activo baja a la
+                            // selección explícita de esta página menos esa.
+                            if (todas) {
+                              setTodas(false);
+                              setSeleccion(new Set(idsDePagina.filter((id) => id !== t._id)));
+                            } else alternar(t._id);
+                          }}
+                          className="h-4 w-4 cursor-pointer accent-primary"
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-3 font-medium text-ink">
                       <Link href={`/tasks/${t._id}`} className="hover:text-primary hover:underline">
                         {t.name}
