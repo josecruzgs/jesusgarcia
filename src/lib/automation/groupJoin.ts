@@ -486,6 +486,10 @@ export async function unirseAlGrupo(
   await page.locator(`[${BUTTON_MARK}="join"]`).first().click({ timeout: 8000 });
   await log("info", "Clic en \"Unirte al grupo\".");
 
+  // Lo que decía el último diálogo sin preguntas (un aviso con "OK"). Si al
+  // final no quedó la solicitud, ese texto es casi siempre el porqué.
+  let ultimoAviso = "";
+
   for (let ronda = 0; ronda < DIALOG_ROUNDS; ronda++) {
     const cambio = await esperarCambio(page, STATE_TIMEOUT_MS);
     await assertNoBlocker();
@@ -499,12 +503,16 @@ export async function unirseAlGrupo(
     }
     if (!cambio.dialog) break;
 
-    const dialogo = await leerDialogo(page);
+    const dialogo = await esperarDialogoCargado(page);
     if (!dialogo.found) continue;
     await log(
       "info",
       `Diálogo "${dialogo.title || "sin título"}" con ${dialogo.controls.length} campo(s); botones: ${dialogo.buttons.join(", ") || "—"}`,
     );
+    if (!dialogo.controls.length) {
+      ultimoAviso = dialogo.text.slice(0, 300);
+      await log("info", `Texto del diálogo: ${ultimoAviso || "(vacío)"}`);
+    }
 
     if (dialogo.controls.some((c) => !c.checked || c.kind === "text")) {
       const answers = soloReglas(dialogo) ?? (await responderConClaude(dialogo, persona, contexto));
@@ -538,6 +546,32 @@ export async function unirseAlGrupo(
   }
   throw new Error(
     "Se enviaron los pasos pero Facebook no muestra la solicitud: el botón sigue en \"Unirte al grupo\". " +
-      "Puede que haya rechazado el formulario o que el perfil esté limitado para unirse a grupos.",
+      (ultimoAviso
+        ? `Facebook mostró este aviso: "${ultimoAviso}".`
+        : "Puede que haya rechazado el formulario o que el perfil esté limitado para unirse a grupos."),
   );
+}
+
+const CARGANDO = /^(loading|cargando)\b/i;
+const CARGA_MAX_MS = 12000;
+
+/**
+ * Lee el diálogo cuando terminó de cargar.
+ *
+ * Facebook abre el formulario del grupo enseguida con el título "Loading…" y
+ * lo llena después. Leerlo en ese momento daba 0 campos y solo "Close", y la
+ * tarea seguía con lo que hubiera aparecido mientras tanto, sin leerlo: se vio
+ * clickear un "OK" que no estaba en la lectura y terminar sin solicitud.
+ */
+async function esperarDialogoCargado(page: Page): Promise<DialogProbe> {
+  const hasta = Date.now() + CARGA_MAX_MS;
+  for (;;) {
+    const dialogo = await leerDialogo(page);
+    const cargando =
+      dialogo.found &&
+      (CARGANDO.test(dialogo.title) ||
+        (!dialogo.controls.length && dialogo.buttons.every((b) => /^(close|cerrar)$/i.test(b))));
+    if (!cargando || Date.now() >= hasta) return dialogo;
+    await page.waitForTimeout(600);
+  }
 }
