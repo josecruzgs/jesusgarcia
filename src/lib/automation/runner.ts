@@ -236,6 +236,14 @@ const FACEBOOK_POST_LIKED_MARK = "data-godeye-post-liked";
  * contador.
  *
  * Se comparan contra el rótulo normalizado: en minúsculas y sin acentos.
+ *
+ * En el visor de reels el pulgar se rotula con su contador después de una coma
+ * ("Like, 3 reactions", "Me gusta, 3 reacciones"), y al lado hay un "React" de
+ * 16 px —la flechita que abre el selector— que queda tapado hasta que el mouse
+ * pasa por el pulgar. Sin la coma en los exactos se elegía esa flechita: el
+ * hover de las reacciones ("Me enoja", "Me encanta"…) esperaba quince segundos
+ * a que recibiera el puntero y fallaban todas. La coma —no los dos puntos— es
+ * lo que lo separa del contador "Me gusta: 8 personas" de arriba.
  */
 const FACEBOOK_LIKE_ARIA_PATTERNS = [
   "^reaccionar\\b",
@@ -244,12 +252,12 @@ const FACEBOOK_LIKE_ARIA_PATTERNS = [
   "^reagire\\b",
   "^reagieren\\b",
   "^indicar que te gusta",
-  "^me gusta$",
-  "^like$",
-  "^j'aime$",
-  "^curtir$",
-  "^mi piace$",
-  "^gefallt mir$",
+  "^me gusta(, [^:]*)?$",
+  "^like(, [^:]*)?$",
+  "^j'aime(, [^:]*)?$",
+  "^curtir(, [^:]*)?$",
+  "^mi piace(, [^:]*)?$",
+  "^gefallt mir(, [^:]*)?$",
   "^begen$",
   "^tepki ver",
 ];
