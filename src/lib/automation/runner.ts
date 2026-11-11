@@ -405,6 +405,24 @@ const FACEBOOK_BLOCKERS = [
     ],
   },
   {
+    // Diálogo "Abre Facebook en tu dispositivo móvil para confirmar tu
+    // identidad · Se restringieron algunas acciones debido a actividad
+    // inusual". Sale al intentar una acción (p. ej. unirse a un grupo). La
+    // cuenta NO está bloqueada: se libera confirmando desde la app de Facebook
+    // del celular de la cuenta, y reintentar desde aquí solo suma intentos.
+    // Por eso tiene su propio mensaje (FACEBOOK_CONFIRMAR_IDENTIDAD) y no el de
+    // "detuvo este perfil", que en campañas ofrece eliminar el perfil. Frases
+    // completas y no "actividad inusual" a secas, porque el texto se busca en
+    // toda la página y un post del feed podría decirlo.
+    label: "confirmar identidad en el celular",
+    text: [
+      "se restringieron algunas acciones",
+      "en tu dispositivo movil para confirmar tu identidad",
+      "restricted some actions",
+      "on your mobile device to confirm your identity",
+    ],
+  },
+  {
     label: "sesion requerida",
     text: ["iniciar sesion en facebook", "log in to facebook"],
   },
@@ -507,6 +525,15 @@ function normalizePageText(value: string) {
  */
 const USUARIO_NO_LOGEADO = "Usuario no logeado";
 
+/**
+ * El mensaje cuando Facebook pide confirmar la identidad desde el celular.
+ * Detiene la tarea igual que un freno, pero a propósito NO dice "detuvo este
+ * perfil": la cuenta se recupera sola en cuanto alguien confirma en la app, y
+ * con ese texto la pantalla de campañas ofrecería eliminarla.
+ */
+const FACEBOOK_CONFIRMAR_IDENTIDAD =
+  "Facebook pide confirmar la identidad desde el celular de la cuenta: restringió algunas acciones por actividad inusual. No está bloqueado; confírmalo en la app de Facebook de ese celular y relanza la tarea.";
+
 async function knownFacebookBlocker(page: Page): Promise<string | null> {
   const url = page.url();
   const enInstagram = url.includes("instagram.com");
@@ -537,6 +564,7 @@ async function knownFacebookBlocker(page: Page): Promise<string | null> {
       // perdió la sesión. "Facebook detuvo este perfil" además hace que la
       // pantalla de campañas ofrezca eliminarlo.
       if (blocker.label === "sesion requerida") return USUARIO_NO_LOGEADO;
+      if (blocker.label === "confirmar identidad en el celular") return FACEBOOK_CONFIRMAR_IDENTIDAD;
       return `Facebook detuvo este perfil por ${blocker.label}. Requiere accion manual en la cuenta antes de volver a usarla.`;
     }
   }
@@ -2043,7 +2071,7 @@ async function prepareSelectorTarget(page: Page, rawSelector: string, ctx: StepC
         target = await firstClickableLocator(page, abrir, 2500);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        if (message.startsWith("Facebook detuvo este perfil") || message.startsWith(USUARIO_NO_LOGEADO)) throw err;
+        if (message.startsWith("Facebook detuvo este perfil") || message.startsWith(FACEBOOK_CONFIRMAR_IDENTIDAD) || message.startsWith(USUARIO_NO_LOGEADO)) throw err;
       }
     }
 

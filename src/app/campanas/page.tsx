@@ -130,7 +130,7 @@ function relaunchVerb(status: string) {
 function colorDelError(task: CampaignTask) {
   const error = task.error ?? "";
   if (/detuvo este perfil/.test(error)) return "text-critical";
-  if (/Usuario no logeado|cerró la sesión de este perfil/.test(error)) return "text-warning";
+  if (/Usuario no logeado|cerró la sesión de este perfil|pide confirmar la identidad/.test(error)) return "text-warning";
   return "text-series-1";
 }
 
