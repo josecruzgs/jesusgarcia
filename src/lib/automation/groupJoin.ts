@@ -76,6 +76,8 @@ type FormControl = {
   /** El texto alrededor del control: de ahí sale la pregunta. */
   context: string;
   checked?: boolean;
+  /** Solo para text: lo que ya tiene escrito. */
+  value?: string;
 };
 
 type DialogProbe = {
@@ -216,6 +218,42 @@ async function leerDialogo(page: Page): Promise<DialogProbe> {
             "",
         ).slice(0, 200);
 
+      // El texto de la opción misma ("Sí", "No", "Acepto las reglas"): el
+      // ancestro más cercano con texto que no envuelva a otro control. Antes
+      // se tomaba el innerText del padre, que en Facebook es el bloque de
+      // opciones entero ("Puedes elegir una sola opción Sí No") y dejaba al
+      // Sí y al No con la misma etiqueta: Claude no podía distinguirlos.
+      const SELECTOR_OPCION = 'input[type="radio"], [role="radio"], input[type="checkbox"], [role="checkbox"], [role="switch"]';
+      // Cuántas opciones distintas hay dentro de `node`. Un <input> envuelto
+      // en un [role="radio"] es una sola opción, no dos.
+      const opcionesEn = (node: Element) =>
+        Array.from(node.querySelectorAll(SELECTOR_OPCION)).filter((x) => {
+          const envoltorio = x.parentElement?.closest(SELECTOR_OPCION);
+          return !envoltorio || !node.contains(envoltorio);
+        }).length;
+      const textoDeOpcion = (el: Element) => {
+        const aria = el.getAttribute("aria-label");
+        if (aria) return norm(aria);
+        const porId = el.getAttribute("aria-labelledby");
+        if (porId) {
+          const t = norm(
+            porId
+              .split(/\s+/)
+              .map((id) => document.getElementById(id)?.innerText ?? "")
+              .join(" "),
+          );
+          if (t) return t;
+        }
+        let node: Element | null = el;
+        while (node && node !== dialog) {
+          if (node !== el && opcionesEn(node) > 1) break;
+          const t = norm((node as HTMLElement).innerText ?? "");
+          if (t) return t.slice(0, 200);
+          node = node.parentElement;
+        }
+        return "";
+      };
+
       const controls: {
         id: string;
         kind: "text" | "radio" | "checkbox";
@@ -223,6 +261,7 @@ async function leerDialogo(page: Page): Promise<DialogProbe> {
         label: string;
         context: string;
         checked?: boolean;
+        value?: string;
       }[] = [];
       let n = 0;
 
@@ -235,7 +274,10 @@ async function leerDialogo(page: Page): Promise<DialogProbe> {
         if (el.parentElement?.closest('[contenteditable="true"]')) continue;
         const id = `q${n++}`;
         el.setAttribute(mark, id);
-        controls.push({ id, kind: "text", label: etiqueta(el), context: contexto(el) });
+        const value = norm(
+          (el as HTMLInputElement).value ?? (el as HTMLElement).innerText ?? "",
+        );
+        controls.push({ id, kind: "text", label: etiqueta(el), context: contexto(el), value });
       }
 
       const grupos = new Map<Element | string, string>();
@@ -252,7 +294,7 @@ async function leerDialogo(page: Page): Promise<DialogProbe> {
           id,
           kind: "radio",
           group: grupos.get(clave),
-          label: etiqueta(el),
+          label: textoDeOpcion(el),
           context: group ? contexto(group) : contexto(el),
           checked: (el as HTMLInputElement).checked || el.getAttribute("aria-checked") === "true",
         });
@@ -266,10 +308,33 @@ async function leerDialogo(page: Page): Promise<DialogProbe> {
         controls.push({
           id,
           kind: "checkbox",
-          label: etiqueta(el),
+          label: textoDeOpcion(el),
           context: contexto(el),
           checked: (el as HTMLInputElement).checked || el.getAttribute("aria-checked") === "true",
         });
+      }
+
+      // La pregunta de cada control: el bloque más grande que lo contiene
+      // sin contener controles de otra pregunta. El contenedor inmediato de
+      // un radio de Facebook solo dice "Puedes elegir una sola opción Sí No";
+      // la pregunta está un nivel más arriba, como hermana de las opciones.
+      const grupoDe = new Map(controls.map((c) => [c.id, c.group ?? c.id]));
+      for (const c of controls) {
+        const el = dialog.querySelector(`[${mark}="${c.id}"]`);
+        if (!el) continue;
+        const propio = c.group ?? c.id;
+        let mejor = "";
+        let node: Element | null = el.parentElement;
+        while (node && node !== dialog) {
+          const ajeno = Array.from(node.querySelectorAll(`[${mark}]`)).some(
+            (o) => grupoDe.get(o.getAttribute(mark) ?? "") !== propio,
+          );
+          if (ajeno) break;
+          const t = norm((node as HTMLElement).innerText ?? "");
+          if (t) mejor = t;
+          node = node.parentElement;
+        }
+        if (mejor.length > c.context.length) c.context = mejor.slice(0, 500);
       }
 
       const buttons = Array.from(dialog.querySelectorAll<HTMLElement>('[role="button"], button'))
@@ -310,7 +375,7 @@ const ANSWERS_SCHEMA = {
 
 const SYSTEM = `Llenas el formulario de ingreso a un grupo de Facebook en nombre de la persona dueña de la cuenta.
 
-Recibes el texto del diálogo y la lista de controles, cada uno con un id. Devuelve:
+Recibes el texto del diálogo y la lista de controles, cada uno con un id. En radios y casillas, "label" es el texto de esa opción ("Sí", "No", "Acepto las reglas") y "context" el bloque de la pregunta a la que pertenece. Devuelve:
 - "texts": una respuesta por cada campo de texto (kind "text"), con su id.
 - "select": los ids de las opciones a marcar. En cada grupo de radios (mismo "group") elige exactamente una. En casillas marca las que correspondan, y siempre la de aceptar las reglas del grupo si existe.
 
@@ -318,7 +383,7 @@ Cómo responder:
 - Como lo escribiría esa persona: primera persona, natural, breve (una o dos frases), en el idioma de la pregunta. Sin sonar a plantilla ni a vendedor.
 - Usa el contexto que te den (de dónde es, por qué le interesa el grupo). Si una pregunta pide algo que el contexto no dice, contesta algo verosímil y genérico que sea coherente con la persona y con el tema del grupo.
 - Nunca inventes correos, teléfonos, números de identificación ni enlaces. Si un campo pide eso, deja su value vacío.
-- Si el grupo pide aceptar reglas, acéptalas.`;
+- Si el grupo pide aceptar reglas, acéptalas. A las preguntas de sí/no sobre estar de acuerdo con el grupo, respetar a los demás o no publicar insultos, spam o información falsa, responde que sí.`;
 
 function client(): Anthropic {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -413,7 +478,8 @@ async function llenar(page: Page, dialogo: DialogProbe, answers: Answers, log: L
     const label = el.locator("xpath=ancestor::label[1]");
     if (await label.count()) await label.click({ timeout: 5000 });
     else await el.click({ timeout: 5000, force: true });
-    await log("info", `Marcado: ${control.label || control.context.slice(0, 80)}`);
+    const pregunta = control.context.replace(control.label, "").trim().slice(0, 100);
+    await log("info", `Marcado: ${control.label}${pregunta ? ` (${pregunta})` : ""}`);
   }
 }
 
@@ -489,6 +555,8 @@ export async function unirseAlGrupo(
   // Lo que decía el último diálogo sin preguntas (un aviso con "OK"). Si al
   // final no quedó la solicitud, ese texto es casi siempre el porqué.
   let ultimoAviso = "";
+  // Títulos de los formularios ya contestados en esta tarea.
+  const respondidos = new Set<string>();
 
   for (let ronda = 0; ronda < DIALOG_ROUNDS; ronda++) {
     const cambio = await esperarCambio(page, STATE_TIMEOUT_MS);
@@ -514,21 +582,40 @@ export async function unirseAlGrupo(
       await log("info", `Texto del diálogo: ${ultimoAviso || "(vacío)"}`);
     }
 
-    if (dialogo.controls.some((c) => !c.checked || c.kind === "text")) {
+    // Se contesta la primera vez que aparece el formulario, y después solo si
+    // quedó algo sin responder. Antes se volvía a llamar a Claude en cada
+    // vuelta porque los "No" de cada pregunta siempre quedan desmarcados.
+    const primeraVez = !respondidos.has(dialogo.title);
+    if (dialogo.controls.length && (primeraVez || faltaResponder(dialogo))) {
       const answers = soloReglas(dialogo) ?? (await responderConClaude(dialogo, persona, contexto));
       await llenar(page, dialogo, answers, log);
+      respondidos.add(dialogo.title);
       await page.waitForTimeout(800);
     }
 
-    const boton = await avanzar(page);
+    let boton = await avanzar(page);
     if (!boton) {
+      // El "Enviar" se deshabilita mientras Facebook procesa el envío
+      // anterior: esperar a que el diálogo se cierre o el botón vuelva.
+      const tras = await esperarDialogoListo(page, ENVIO_TIMEOUT_MS);
+      if (tras === "cerrado") continue;
+      boton = await avanzar(page);
+    }
+    if (!boton) {
+      const releido = await leerDialogo(page);
+      const pendientes = preguntasSinResponder(releido);
       throw new Error(
         `El diálogo "${dialogo.title}" no tiene un botón para enviar habilitado (botones: ${dialogo.buttons.join(", ") || "ninguno"}). ` +
-          "Puede que falte una respuesta obligatoria.",
+          (pendientes.length
+            ? `Quedó sin responder: ${pendientes.join(" | ")}.`
+            : "Puede que falte una respuesta obligatoria."),
       );
     }
     await log("info", `Clic en "${boton}".`);
     await page.waitForTimeout(1500);
+    if (/^(enviar|enviar respuestas|submit)$/.test(boton)) {
+      await esperarDialogoListo(page, ENVIO_TIMEOUT_MS);
+    }
   }
 
   // Último intento: recargar y leer el botón de cero. A veces el diálogo se
@@ -550,6 +637,55 @@ export async function unirseAlGrupo(
         ? `Facebook mostró este aviso: "${ultimoAviso}".`
         : "Puede que haya rechazado el formulario o que el perfil esté limitado para unirse a grupos."),
   );
+}
+
+const ENVIO_TIMEOUT_MS = 15000;
+
+/** Preguntas que siguen sin respuesta: grupos de radios sin marcar y campos de texto vacíos. */
+function preguntasSinResponder(dialogo: DialogProbe): string[] {
+  const out: string[] = [];
+  const grupos = new Map<string, FormControl[]>();
+  for (const c of dialogo.controls) {
+    if (c.kind === "text" && !c.value) out.push((c.context || c.label).slice(0, 80));
+    if (c.kind === "radio" && c.group) grupos.set(c.group, [...(grupos.get(c.group) ?? []), c]);
+  }
+  for (const opciones of grupos.values()) {
+    if (!opciones.some((o) => o.checked)) out.push(opciones[0].context.slice(0, 80));
+  }
+  return out;
+}
+
+function faltaResponder(dialogo: DialogProbe) {
+  return preguntasSinResponder(dialogo).length > 0;
+}
+
+/**
+ * Después de "Enviar": espera a que el diálogo se cierre o a que vuelva a
+ * tener un botón habilitado para seguir. Leerlo enseguida lo encontraba con
+ * el "Enviar" deshabilitado (Facebook procesando) y la tarea fallaba como si
+ * faltara una respuesta.
+ */
+async function esperarDialogoListo(page: Page, timeoutMs: number): Promise<"cerrado" | "abierto"> {
+  const hasta = Date.now() + timeoutMs;
+  while (Date.now() < hasta) {
+    const abierto = await page
+      .locator('[role="dialog"]')
+      .last()
+      .isVisible()
+      .catch(() => false);
+    if (!abierto) return "cerrado";
+    const habilitado = await page
+      .locator('[role="dialog"]')
+      .last()
+      .locator('[role="button"]:not([aria-disabled="true"]), button:not([disabled])')
+      .filter({ hasText: /^(enviar|submit|aceptar|ok|listo|done|continuar|continue|siguiente|next)$/i })
+      .first()
+      .isVisible()
+      .catch(() => false);
+    if (habilitado) return "abierto";
+    await page.waitForTimeout(700);
+  }
+  return "abierto";
 }
 
 const CARGANDO = /^(loading|cargando)\b/i;
