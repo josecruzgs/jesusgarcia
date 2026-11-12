@@ -776,6 +776,29 @@ function rutaDePublicacion(valor: string) {
 }
 
 /**
+ * Si el comentario recién publicado quedó fuera de la publicación de la tarea.
+ *
+ * Comparar solo el permalink del comentario daba falsos positivos: Facebook
+ * nombra la misma publicación de muchas formas (`/posts/pfbid…` con códigos
+ * que cambian entre sesiones, `/permalink.php`, `/photo/?fbid=`, el id
+ * numérico), así que el enlace que devuelve el servidor casi nunca coincide
+ * letra por letra con la URL en la que está el navegador. La tarea se marcaba
+ * fallida con el comentario bien puesto, el operador la relanzaba y el
+ * comentario quedaba duplicado.
+ *
+ * Lo confiable es dónde está el navegador: antes de enviar ya se verificó que
+ * estaba en la publicación pedida. Solo hay deriva si ni el navegador ni el
+ * permalink coinciden con la publicación de la tarea.
+ */
+function comentarioFueraDeLaPublicacion(page: Page, ctx: StepContext, permalink: string | null | undefined) {
+  const objetivo = ctx.targetUrl;
+  // Sin permalink no hay con qué afirmar que quedó en otra parte.
+  if (!objetivo || !permalink) return false;
+  const ruta = rutaDePublicacion(objetivo);
+  return rutaDePublicacion(page.url()) !== ruta && rutaDePublicacion(permalink) !== ruta;
+}
+
+/**
  * Corta la tarea si el navegador ya no está en la publicación pedida.
  *
  * Se usa donde volver ya no sirve porque el daño sería irreversible: una vez
@@ -3501,10 +3524,10 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
           perfilUrl = perfilUrl ?? enPantalla.perfilUrl;
         }
 
-        if (ctx.targetUrl && url && rutaDePublicacion(url) !== rutaDePublicacion(ctx.targetUrl)) {
+        if (comentarioFueraDeLaPublicacion(page, ctx, url)) {
           throw new Error(
-            `El comentario se publicó en otra publicación (${url}) en vez de la pedida. El visor se movió ` +
-              `durante la tarea. Hay que borrarlo a mano.`,
+            `El comentario se publicó en otra publicación (${url ?? page.url()}) en vez de la pedida ` +
+              `(${ctx.targetUrl}). El visor se movió durante la tarea. Hay que borrarlo a mano.`,
           );
         }
 
@@ -3561,10 +3584,10 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
       // publicación pedida. Sin esto, un comentario publicado en el reel al que
       // el visor derivó daba la tarea por EXITOSA — el error más caro posible,
       // porque no deja rastro de que algo salió mal.
-      if (ctx.targetUrl && probe.url && rutaDePublicacion(probe.url) !== rutaDePublicacion(ctx.targetUrl)) {
+      if (comentarioFueraDeLaPublicacion(page, ctx, probe.url)) {
         throw new Error(
-          `El comentario se publicó en otra publicación (${probe.url}) en vez de la pedida. El visor se movió ` +
-            `durante la tarea. Hay que borrarlo a mano.`,
+          `El comentario se publicó en otra publicación (${probe.url ?? page.url()}) en vez de la pedida ` +
+            `(${ctx.targetUrl}). El visor se movió durante la tarea. Hay que borrarlo a mano.`,
         );
       }
 
