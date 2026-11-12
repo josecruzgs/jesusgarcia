@@ -509,6 +509,11 @@ type StepContext = {
   persona?: Persona;
   /** El envío del comentario escrito, escuchado en la red. Ver vigilarEnvioComentario. */
   envioComentario?: EnvioComentario;
+  /**
+   * La tarea es un relanzamiento que ya había enviado el comentario: antes de
+   * escribirlo se busca en la publicación, por si quedó. Ver yaIntentoEnviarComentario.
+   */
+  revisarDuplicado?: boolean;
 };
 
 function normalizePageText(value: string) {
@@ -3294,6 +3299,47 @@ async function followFacebookProfile(page: Page, ctx: StepContext) {
  */
 class SesionCaidaError extends Error {}
 
+/**
+ * El comentario de la tarea ya está en la publicación: lo dejó una corrida
+ * anterior que se dio por fallida (o se cortó) después de enviarlo.
+ *
+ * No es un error de verdad: corta los pasos que faltan y la tarea termina en
+ * éxito con ese comentario. Publicarlo otra vez es justo el duplicado que esto
+ * evita.
+ */
+class ComentarioYaPublicadoError extends Error {
+  constructor(readonly probe: CommentProbe) {
+    super("El comentario de esta tarea ya estaba publicado.");
+  }
+}
+
+/**
+ * Si una corrida anterior de esta tarea de comentario llegó a enviarlo.
+ *
+ * Cada tarea tiene su texto único (sale del banco y se marca usado), así que
+ * lo que importa es si alguna vez se apretó "enviar". Se lee del log de pasos:
+ * cada corrida deja "Step N/M: …" antes de ejecutar cada paso, y basta que haya
+ * llegado al de envío. Una tarea que nunca pasó de ahí no pudo haber publicado,
+ * y a esa no se le hace perder tiempo buscando.
+ */
+async function yaIntentoEnviarComentario(taskId: string, steps: Step[]) {
+  const captura = steps.findIndex((s) => s.action === "captureComment");
+  if (captura < 0) return false;
+  let envio = -1;
+  for (let i = captura - 1; i >= 0; i -= 1) {
+    if (steps[i].action === "press" || steps[i].action === "click") {
+      envio = i;
+      break;
+    }
+  }
+  if (envio < 0) return false;
+
+  const logs = await TaskLogModel.find({ taskId, message: /^Step \d+\/\d+: / })
+    .select("message")
+    .lean<{ message: string }[]>();
+  return logs.some((l) => Number(l.message.match(/^Step (\d+)\//)?.[1] ?? 0) - 1 >= envio);
+}
+
 const FACEBOOK_LOGIN_SUBMIT_SELECTOR = 'button[name="login"]';
 
 /**
@@ -3765,6 +3811,21 @@ async function runStep(page: Page, step: Step, ctx: StepContext) {
           esTareaDeComentario(ctx.taskType) &&
           (isFacebookCommentBoxSelector(step.selector) || isInstagramCommentBoxSelector(step.selector))
         ) {
+          // Un relanzamiento de algo que ya se envió: si el comentario está,
+          // escribirlo otra vez lo duplica. Se busca antes de tocar la caja.
+          const texto = step.value?.trim();
+          if (ctx.revisarDuplicado && texto) {
+            const enInstagram = platformFromUrl(page.url()) === "instagram";
+            await log(ctx.taskId, "info", "La tarea ya había enviado el comentario antes; se busca en la publicación antes de escribirlo.");
+            const previo = await waitForPublishedComment(
+              page,
+              texto,
+              12000,
+              enInstagram ? { alNoEncontrar: () => scrollInstagramComments(page), sinEnlace: true } : {},
+            );
+            if (previo.encontrado) throw new ComentarioYaPublicadoError(previo);
+            await log(ctx.taskId, "info", "No se encontró el comentario anterior en la publicación; se escribe.");
+          }
           await escribirEnCaja(page, target, step.value ?? "", ctx);
           ctx.envioComentario?.cancelar();
           ctx.envioComentario = vigilarEnvioComentario(page, step.value ?? "");
@@ -3989,6 +4050,24 @@ export async function runTask(taskId: string) {
     }
   }
 
+  // Un comentario que ya tiene permalink guardado está publicado: relanzarlo
+  // solo puede duplicarlo. Se da por cumplido sin abrir el navegador.
+  if (esTareaDeComentario(task.type) && task.resultUrl) {
+    task.status = "success";
+    task.error = undefined;
+    task.finishedAt = new Date();
+    await task.save();
+    await log(taskId, "info", `El comentario ya estaba publicado (${task.resultUrl}); no se vuelve a comentar.`);
+    await resolverRamasDe(task).catch((err) =>
+      log(taskId, "warn", `No se pudieron resolver las ramas hijas: ${err instanceof Error ? err.message : String(err)}`),
+    );
+    return task;
+  }
+
+  // Antes de que esta corrida escriba su propio log de pasos.
+  const revisarDuplicado =
+    esTareaDeComentario(task.type) && (await yaIntentoEnviarComentario(taskId, task.steps as Step[]));
+
   task.status = "running";
   task.startedAt = new Date();
   await task.save();
@@ -4021,6 +4100,7 @@ export async function runTask(taskId: string) {
         profileName: profile.name,
         taskType: task.type,
         targetUrl,
+        revisarDuplicado,
         persona: { name: profile.name, age: profile.age, gender: profile.gender },
         onResult: ({ url, perfilUrl }) => {
           if (url) task.resultUrl = url;
@@ -4047,6 +4127,16 @@ export async function runTask(taskId: string) {
         // siempre: la tarea se abortaba con el comentario ya escrito.
         if (s.action === "goto") targetUrl = page.url();
       } catch (err) {
+        if (err instanceof ComentarioYaPublicadoError) {
+          if (err.probe.url) task.resultUrl = err.probe.url;
+          if (err.probe.perfilUrl) task.resultProfileUrl = err.probe.perfilUrl;
+          await log(
+            taskId,
+            "info",
+            `El comentario ya estaba publicado de una corrida anterior${err.probe.url ? ` (${err.probe.url})` : ""}; no se vuelve a comentar.`,
+          );
+          break;
+        }
         if (!s.optional || err instanceof SesionCaidaError) throw err;
         const message = err instanceof Error ? err.message : String(err);
         await log(taskId, "warn", `Step opcional ${i + 1} no aplicó, se continúa: ${message}`);
