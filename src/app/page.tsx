@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
@@ -13,6 +14,11 @@ import {
   Radio,
   ExternalLink,
   AlertTriangle,
+  Megaphone,
+  CheckCircle2,
+  VolumeX,
+  Newspaper,
+  Sparkles,
 } from "lucide-react";
 import { dbConnect } from "@/lib/mongodb";
 import { currentUser, allowedGroupFilter, allowedGroupIdFilter, ownerFilter, visibleOwnerFilter, type SessionUser } from "@/lib/auth/dal";
@@ -33,6 +39,14 @@ import Meter from "@/components/Meter";
 import CampaignTrendChart, { type TrendPoint } from "@/components/charts/CampaignTrendChart";
 import TopProfilesChart, { type ProfileRow } from "@/components/charts/TopProfilesChart";
 import { getListeningDigest } from "@/lib/listening/dashboard";
+import {
+  BarrasAntesDespues,
+  BarraPagina,
+  LeyendaAntesDespues,
+  ComparativaCortes,
+  FilaPagina,
+  DatoDestacado,
+} from "@/components/charts/AntesDespues";
 
 const TREND_DAYS = 14;
 
@@ -170,6 +184,118 @@ const ELEMENT_LINKS: Record<string, { href: string; cta: string }> = {
   fuego: { href: "/dia-d", cta: "Preparar" },
 };
 
+// Resumen de lo logrado con las campañas, copiado a mano del reporte público
+// (conversacion-tijuana.vercel.app). Va fijo a propósito: es una vitrina de
+// resultados ya cerrados, no una métrica viva; al salir un corte nuevo se
+// actualiza aquí.
+const RESULTADOS: {
+  corte: string;
+  kpis: { value: string; label: string; detalle: string; icon: typeof Megaphone }[];
+}[] = [
+  {
+    corte: "Octubre · 23–30 oct 2026 · 20 páginas",
+    kpis: [
+      { value: "28.7M", label: "Impactos potenciales", detalle: "en una semana", icon: Megaphone },
+      { value: "+334%", label: "Más comentarios", detalle: "de 413 a 1,794", icon: MessageSquare },
+      { value: "93/93", label: "Publicaciones crecieron", detalle: "sin excepción", icon: CheckCircle2 },
+      { value: "0%", label: "Notas en silencio", detalle: "antes era el 47%", icon: VolumeX },
+    ],
+  },
+  {
+    corte: "Noviembre · nuevo corte · 3 páginas",
+    kpis: [
+      { value: "316", label: "Comentarios", detalle: "en 20 publicaciones nuevas (antes 22)", icon: MessageSquare },
+      { value: "14.4×", label: "Más conversación", detalle: "de 1.1 a 15.8 comentarios por nota", icon: TrendingUp },
+      { value: "20/20", label: "Publicaciones crecieron", detalle: "ninguna baja de 10 comentarios", icon: Newspaper },
+      { value: "3.9M", label: "Impactos potenciales", detalle: "AFN, Ajedrez Político y YoSoy664", icon: Sparkles },
+    ],
+  },
+];
+
+// Las gráficas del mismo reporte: dos cortes, la misma tendencia.
+const GRAFICAS = [
+  {
+    title: "Comentarios por nota",
+    tag: "promedio por publicación",
+    sufijo: "",
+    max: undefined as number | undefined,
+    cortes: [
+      { mes: "Octubre", antes: 4.4, despues: 19.3 },
+      { mes: "Noviembre", antes: 1.1, despues: 15.8 },
+    ],
+  },
+  {
+    title: "Notas en silencio",
+    tag: "con cero comentarios",
+    sufijo: "%",
+    max: 100,
+    cortes: [
+      { mes: "Octubre", antes: 47, despues: 0 },
+      { mes: "Noviembre", antes: 55, despues: 0 },
+    ],
+  },
+  {
+    title: "Notas con más de 10 comentarios",
+    tag: "% de publicaciones",
+    sufijo: "%",
+    max: 100,
+    cortes: [
+      { mes: "Octubre", antes: 13, despues: 94 },
+      { mes: "Noviembre", antes: 0, despues: 100 },
+    ],
+  },
+];
+
+// "Antes nadie respondía. Hoy todos conversan." — corte 1 contra corte 2 de octubre.
+const COMPARATIVA = {
+  antes: [
+    { value: "47%", label: "de las publicaciones sin un solo comentario" },
+    { value: "4.4", label: "comentarios promedio por publicación" },
+    { value: "12", label: "publicaciones superaban los 10 comentarios" },
+  ],
+  ahora: [
+    { value: "0%", label: "de las publicaciones sin comentarios. Todas tienen conversación activa." },
+    { value: "19.3", label: "comentarios promedio por publicación" },
+    { value: "87", label: "de 93 publicaciones superan hoy los 10 comentarios" },
+  ],
+};
+
+// "20 de 20 páginas crecieron" — comentarios por página, corte 1 → corte 2 de octubre.
+const PAGINAS_OCTUBRE = [
+  { nombre: "Yo Amo Tijuana", seguidores: "1.4 M", antes: 119, despues: 206 },
+  { nombre: "Opinia", seguidores: "124 mil", antes: 43, despues: 161 },
+  { nombre: "Tijuana En Línea", seguidores: "238 mil", antes: 37, despues: 147 },
+  { nombre: "Tijuana Noticias", seguidores: "199 mil", antes: 0, despues: 126 },
+  { nombre: "Ajedrez Político", seguidores: "44 mil", antes: 4, despues: 90 },
+  { nombre: "Daniel Andrade Noticias", seguidores: "226 mil", antes: 13, despues: 75 },
+  { nombre: "SanDiegoRed.com", seguidores: "341 mil", antes: 21, despues: 67 },
+  { nombre: "Tijuana YoSoy664", seguidores: "422 mil", antes: 1, despues: 42 },
+  { nombre: "Tijuana en La Noticia", seguidores: "3 mil", antes: 2, despues: 23 },
+  { nombre: "Noticias de Tijuana", seguidores: "1.4 M", antes: 2, despues: 19 },
+  { nombre: "TjNoticias.info", seguidores: "656 mil", antes: 60, despues: 168 },
+  { nombre: "BCT Neus", seguidores: "48 mil", antes: 6, despues: 153 },
+  { nombre: "Alfredo Alvarez", seguidores: "789 mil", antes: 56, despues: 128 },
+  { nombre: "Ayuntamiento de Tijuana", seguidores: "30 mil", antes: 8, despues: 118 },
+  { nombre: "Tijuana Está Alerta", seguidores: "590 mil", antes: 21, despues: 84 },
+  { nombre: "Noticias y Clima Tijuana", seguidores: "153 mil", antes: 1, despues: 72 },
+  { nombre: "AFN Tijuana", seguidores: "232 mil", antes: 15, despues: 59 },
+  { nombre: "Tijuana Dice", seguidores: "370 mil", antes: 3, despues: 24 },
+  { nombre: "Oye Tijuana", seguidores: "17 mil", antes: 0, despues: 20 },
+  { nombre: "Punto Norte", seguidores: "675 mil", antes: 1, despues: 12 },
+];
+
+const DESTACADOS_PAGINAS = [
+  { value: "+147", label: "BCT Neus: de 6 a 153 en 10 publicaciones" },
+  { value: "0→126", label: "Tijuana Noticias: 9 notas que partían de cero" },
+  { value: "206", label: "Yo Amo Tijuana: la página con más conversación" },
+];
+
+const PAGINAS_NOVIEMBRE = [
+  { nombre: "Ajedrez Político", notas: 8, antes: 2, despues: 124 },
+  { nombre: "AFN Tijuana", notas: 8, antes: 6, despues: 118 },
+  { nombre: "Tijuana YoSoy664", notas: 4, antes: 14, despues: 74 },
+];
+
 const PASOS = [
   { n: "1", t: "Abre el cliente de escritorio o en esta máquina." },
   { n: "2", t: "Corre el worker en otra terminal: npm run worker", code: "npm run worker" },
@@ -202,6 +328,105 @@ export default async function Home() {
       </section>
 
       <div className="bento">
+        <SubHead>Resultados de campañas · resumen total</SubHead>
+
+        <Panel
+          col={12}
+          title="Una semana de resultados que se ven"
+          tag="Tijuana · interacción digital"
+          accent="var(--steel)"
+          right={
+            <a
+              href="https://conversacion-tijuana.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="label-mono inline-flex items-center gap-1 transition-colors hover:text-steel"
+            >
+              Ver reporte <ExternalLink className="h-3 w-3" />
+            </a>
+          }
+        >
+          <p className="text-[13px] leading-relaxed text-ink-secondary">
+            La gestión de Ismael Burgueño llegó al muro de los seguidores de 20 páginas de noticias de Tijuana y
+            Baja California. En noviembre ya no reacciona: se anticipa — 20 de 20 notas lo muestran gobernando.
+          </p>
+        </Panel>
+
+        {RESULTADOS.map((r) => (
+          <Fragment key={r.corte}>
+            <p className="label-mono c12">{r.corte}</p>
+            {r.kpis.map((k) => (
+              <StatCard
+                key={k.label + k.value}
+                label={k.label}
+                value={k.value}
+                icon={k.icon}
+                accent="steel"
+                delta={{ text: k.detalle, positive: true }}
+              />
+            ))}
+          </Fragment>
+        ))}
+
+        <Panel col={12} accent="var(--steel)">
+          <h2 className="mb-5 text-[26px] font-bold uppercase leading-[1.05] tracking-tight text-ink">
+            Antes nadie respondía.
+            <br />
+            <span className="text-steel">Hoy todos conversan.</span>
+          </h2>
+          <ComparativaCortes antes={COMPARATIVA.antes} ahora={COMPARATIVA.ahora} />
+        </Panel>
+
+        <Panel col={12} accent="var(--steel)">
+          <div className="mb-5 grid items-end gap-5 lg:grid-cols-[1fr_auto]">
+            <div>
+              <h2 className="text-[26px] font-bold uppercase leading-[1.05] tracking-tight text-ink">
+                20 de 20 páginas
+                <br />
+                <span className="text-steel">crecieron</span>
+              </h2>
+              <p className="mt-2 max-w-xl text-[13px] leading-relaxed text-ink-secondary">
+                Desde páginas con 1.4 millones de seguidores hasta páginas de 3 mil. El efecto no depende de un
+                solo medio.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {DESTACADOS_PAGINAS.map((d) => (
+                <DatoDestacado key={d.label} {...d} />
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-x-8 gap-y-2.5 md:grid-cols-2">
+            {[PAGINAS_OCTUBRE.slice(0, 10), PAGINAS_OCTUBRE.slice(10)].map((col, i) => (
+              <div key={i} className="flex flex-col gap-2.5">
+                {col.map((p) => (
+                  <FilaPagina key={p.nombre} {...p} max={206} />
+                ))}
+              </div>
+            ))}
+          </div>
+          <div className="mt-4">
+            <LeyendaAntesDespues />
+          </div>
+        </Panel>
+
+        {GRAFICAS.map((g) => (
+          <Panel key={g.title} col={4} title={g.title} tag={g.tag} accent="var(--steel)">
+            <BarrasAntesDespues cortes={g.cortes} sufijo={g.sufijo} max={g.max} />
+          </Panel>
+        ))}
+
+        <Panel col={12} title="Noviembre por página" tag="comentarios antes → después" accent="var(--steel)">
+          <div className="grid gap-5 md:grid-cols-3">
+            {PAGINAS_NOVIEMBRE.map((p) => (
+              <BarraPagina key={p.nombre} {...p} max={124} />
+            ))}
+          </div>
+          <div className="mt-4">
+            <LeyendaAntesDespues nota="Octubre: 93 notas en 20 páginas. Noviembre: 20 notas en 3 páginas." />
+          </div>
+        </Panel>
+
         <SubHead>Estado de la operación</SubHead>
 
         <StatCard label="Perfiles" value={stats.profiles} href="/profiles" icon={Users} accent="steel" />
