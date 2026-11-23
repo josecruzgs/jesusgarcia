@@ -1447,3 +1447,48 @@ body::before {
     transform: none !important;
   }
 }
+
+/* ============================================================================
+   ENCUESTAS (llamadas con la asistente de voz)
+   ----------------------------------------------------------------------------
+   La tabla de llamadas y la base, y las barras de resultados. Van aquí y no
+   como clases sueltas en cada celda: son tablas de cientos de renglones. El
+   encabezado sigue el de las demás tablas del panel (texto chico, mayúsculas,
+   tinta apagada).
+   ========================================================================= */
+.enc-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.enc-tabla th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border-hairline);
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.enc-tabla td {
+  border-top: 1px solid var(--border-hairline);
+  padding: 8px 10px;
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+.enc-tabla tbody tr:hover td {
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+}
+.enc-tabla .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.enc-barra {
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}

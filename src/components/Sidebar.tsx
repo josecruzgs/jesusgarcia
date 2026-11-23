@@ -30,6 +30,8 @@ import {
   Archive,
   ShieldCheck,
   SlidersHorizontal,
+  PhoneCall,
+  Contact,
   type LucideIcon,
   Newspaper,
 } from "lucide-react";
@@ -107,6 +109,16 @@ const NAV_SECTIONS: NavSection[] = [
     icon: Flame,
     collapsible: true,
     items: [{ href: "/dia-d", label: "Día D", icon: Rocket }],
+  },
+  {
+    key: "encuestas",
+    label: "Encuestas",
+    icon: PhoneCall,
+    collapsible: true,
+    items: [
+      { href: "/encuestas", label: "Campañas", icon: PhoneCall },
+      { href: "/encuestas/base", label: "Base de teléfonos", icon: Contact },
+    ],
   },
   {
     key: "recursos",

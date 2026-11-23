@@ -12,6 +12,7 @@ import { leerMotoresDeseados } from "@/lib/workerSettings";
 import { findDueProjects, ingestProject } from "@/lib/listening/ingest";
 import { analyzeMentions } from "@/lib/listening/analyze";
 import { generateNextBriefWindow } from "@/lib/listening/briefSchedule";
+import { hayAgenteDeVoz, importarLlamadasDelAgente, seguirCampanas } from "@/lib/encuestas/agente_voz";
 
 const POLL_INTERVAL_MS = Number(process.env.WORKER_POLL_INTERVAL_MS ?? 5000);
 
@@ -469,6 +470,37 @@ async function bucleDeSupervision() {
   }
 }
 
+/**
+ * Encuestas: cada 2 minutos registra las llamadas que ya colgaron y marca a los
+ * siguientes de cada campaña que esté llamando, en las líneas libres. Mantiene
+ * vivas las campañas aunque nadie tenga el tablero abierto (el tablero abierto
+ * hace lo mismo cada 15 s).
+ *
+ * Va con la escucha y no con los motores porque solo necesita salida a
+ * internet: no toca AdsPower. Sin agente de voz configurado no hace nada.
+ */
+const ENCUESTAS_CADA_MS = 2 * 60_000;
+
+async function bucleDeEncuestas() {
+  while (!stopping) {
+    if (hayAgenteDeVoz()) {
+      try {
+        const r = await importarLlamadasDelAgente({ limite: 40 });
+        const t = await seguirCampanas();
+        if ((r.ok && r.nuevas > 0) || t.marcadas > 0) {
+          console.log(`[encuestas] ${r.ok ? r.nuevas : 0} registradas, ${t.marcadas} marcadas, ${t.campanas} campañas llamando`);
+        }
+        for (const e of t.errores) console.error(`[encuestas] ${e}`);
+        if (!r.ok) console.error(`[encuestas] ${r.error}`);
+      } catch (err) {
+        console.error("[encuestas] error en la pasada:", err);
+      }
+    }
+    // En pedazos cortos, para que un SIGTERM no espere los dos minutos completos.
+    for (let espera = 0; espera < ENCUESTAS_CADA_MS && !stopping; espera += POLL_INTERVAL_MS) await esperar(POLL_INTERVAL_MS);
+  }
+}
+
 /** La escucha, en su propio bucle: no comparte ritmo con los motores. */
 async function bucleDeEscucha() {
   while (!stopping) {
@@ -534,7 +566,7 @@ async function main() {
   // proceso, así que quien los espera es el drenaje del final.
   const fondo: Promise<void>[] = [];
   if (ROLES.includes("tasks")) fondo.push(bucleDeSupervision());
-  if (ROLES.includes("listening")) fondo.push(bucleDeEscucha());
+  if (ROLES.includes("listening")) fondo.push(bucleDeEscucha(), bucleDeEncuestas());
 
   try {
     await Promise.all(fondo);

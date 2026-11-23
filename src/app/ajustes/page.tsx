@@ -6,6 +6,7 @@ import { Check, RotateCcw, Upload, Trash2 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import Card from "@/components/Card";
 import MotoresAdmin from "@/components/MotoresAdmin";
+import CampanasAdmin from "@/components/encuestas/CampanasAdmin";
 import { useSession } from "@/lib/session";
 import { CITIES, findCity } from "@/lib/timezones";
 
@@ -270,6 +271,7 @@ export default function AjustesPage() {
 
           <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
             <MotoresAdmin />
+            <CampanasAdmin />
           </div>
         </section>
       )}

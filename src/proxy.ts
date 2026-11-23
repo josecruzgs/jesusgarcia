@@ -4,7 +4,11 @@ import { SESSION_COOKIE, readSessionToken } from "@/lib/auth/session";
 // Rutas que quedan fuera del gate de sesión: el dashboard público compartido
 // (/share/[token] + la API que consume) y la propia pantalla de login. Todo lo
 // demás (el panel interno) exige una cookie de sesión válida.
-const PUBLIC_PREFIXES = ["/share", "/api/public", "/login", "/api/auth/login", "/api/auth/logout"];
+//
+// /api/encuestas/v1 es la API de Encuestas para otra plataforma: no trae
+// cookie, entra con `Authorization: Bearer <INTEGRACION_TOKEN>`, y sin ese
+// token configurado contesta 503 (src/lib/encuestas/integracion.ts).
+const PUBLIC_PREFIXES = ["/share", "/api/public", "/login", "/api/auth/login", "/api/auth/logout", "/api/encuestas/v1"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
