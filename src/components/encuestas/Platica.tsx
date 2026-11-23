@@ -40,7 +40,7 @@ export default function Platica({ id, titulo, transcripcion, conAudio }: { id: s
                   <p className="label-mono-sm">La llamada</p>
                   <h3 className="font-display mt-0.5 text-[16px] font-semibold text-ink">{titulo}</h3>
                 </div>
-                <button type="button" onClick={() => setAbierta(false)} className="hud-iconbtn" aria-label="Cerrar">
+                <button type="button" onClick={() => setAbierta(false)} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-page hover:text-ink" aria-label="Cerrar">
                   <X className="h-4 w-4" />
                 </button>
               </header>
