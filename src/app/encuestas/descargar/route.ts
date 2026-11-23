@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { withAuth } from "@/lib/apiHandler";
+import { withAuth, HttpError } from "@/lib/apiHandler";
+import { puedeUsarEncuestas } from "@/lib/encuestas/acceso";
 import { leerCampana, campanaPorOmision, resultadosLlamadas, respuestasDe, telefonoVisible, ESTADOS_LLAMADA } from "@/lib/encuestas/llamadas";
 import { ZONA } from "@/lib/encuestas/fechas";
 import { segmentos } from "@/lib/encuestas/base";
@@ -7,6 +8,7 @@ import { clavear } from "@/lib/encuestas/agente_voz";
 
 /** Las encuestas hechas en un archivo que abre Excel: una fila por llamada; de la campaña, solo los últimos 4 dígitos del teléfono. */
 export const GET = withAuth(async (user, req: NextRequest) => {
+  if (!(await puedeUsarEncuestas(user))) throw new HttpError(403, "Encuestas no está abierto para tu usuario");
   const q = req.nextUrl.searchParams;
   const c = q.get("campana") ? await leerCampana(q.get("campana")) : await campanaPorOmision();
   if (!c) return NextResponse.json({ error: "No existe esa campaña" }, { status: 404 });

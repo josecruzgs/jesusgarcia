@@ -3,6 +3,7 @@ import { Space_Grotesk, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/goog
 import ThemeScript from "@/components/ThemeScript";
 import AppShell from "@/components/AppShell";
 import { currentUser } from "@/lib/auth/dal";
+import { puedeUsarEncuestas } from "@/lib/encuestas/acceso";
 import { SessionProvider, type ClientSession } from "@/lib/session";
 import { accentStyle } from "@/lib/theme";
 import "./globals.css";
@@ -55,6 +56,7 @@ export default async function RootLayout({
         id: user.id,
         username: user.username,
         role: user.role,
+        encuestas: await puedeUsarEncuestas(user),
         groupIds: user.groupIds,
         preferences: user.preferences,
       }

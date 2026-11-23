@@ -12,6 +12,8 @@ export type ClientSession = {
   id: string;
   username: string;
   role: "admin" | "operador";
+  /** Si ve Encuestas en el menú: el admin siempre; los demás, si el admin lo abrió en Ajustes. */
+  encuestas: boolean;
   groupIds: string[];
   preferences: Preferences;
 };

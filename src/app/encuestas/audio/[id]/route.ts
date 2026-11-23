@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { Types } from "mongoose";
-import { withAuth } from "@/lib/apiHandler";
+import { withAuth, HttpError } from "@/lib/apiHandler";
+import { puedeUsarEncuestas } from "@/lib/encuestas/acceso";
 import { dbConnect } from "@/lib/mongodb";
 import EncuestaLlamadaModel from "@/lib/models/EncuestaLlamada";
 
@@ -12,7 +13,8 @@ type Params = { params: Promise<{ id: string }> };
  * voz de una persona real, y el cliente no llega (withAuth lo frena).
  * Responde por pedazos (Range) para que el reproductor pueda adelantar y regresar.
  */
-export const GET = withAuth(async (_user, req: NextRequest, { params }: Params) => {
+export const GET = withAuth(async (user, req: NextRequest, { params }: Params) => {
+  if (!(await puedeUsarEncuestas(user))) throw new HttpError(403, "Encuestas no está abierto para tu usuario");
   const { id } = await params;
   if (!Types.ObjectId.isValid(id)) return NextResponse.json({ error: "Esa llamada no existe." }, { status: 404 });
   await dbConnect();

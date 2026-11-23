@@ -203,8 +203,8 @@ export default function Sidebar() {
     () =>
       NAV_SECTIONS.map((section) => ({
         ...section,
-        items: section.items.filter((item) => !item.adminOnly || session?.role === "admin"),
-      })),
+        items: section.items.filter((item) => (!item.adminOnly || session?.role === "admin") && (!item.href.startsWith("/encuestas") || session?.encuestas)),
+      })).filter((section) => section.items.length > 0),
     [session],
   );
 
