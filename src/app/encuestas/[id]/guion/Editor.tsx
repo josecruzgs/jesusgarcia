@@ -114,7 +114,8 @@ export default function Editor({ campanaId, inicial, corregido, rotulos, respues
             <div className="mt-2 space-y-3">
               <div>
                 <label className={LABEL}>Título en las gráficas</label>
-                <input value={p.corto} onChange={(e) => ponPregunta(i, { corto: e.target.value })} maxLength={140} className={INPUT} />
+                <input value={p.corto} onChange={(e) => ponPregunta(i, { corto: e.target.value })} maxLength={140} placeholder={p.texto || "Vacío: se usa el texto de la pregunta"} className={INPUT} />
+                <p className="mt-1 text-[12px] text-ink-muted">Vacío: las gráficas usan el texto de la pregunta. Si cambias el texto, el título viejo se quita solo.</p>
               </div>
               <div>
                 <label className={LABEL}>Indicaciones (una por renglón)</label>

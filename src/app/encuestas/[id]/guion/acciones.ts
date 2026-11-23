@@ -116,7 +116,11 @@ export async function guardarGuion(_prev: Resultado, formData: FormData): Promis
       if (cuantas) return { error: `«${viejo}» (pregunta ${n}) ya tiene ${cuantas} ${cuantas === 1 ? "respuesta" : "respuestas"}: no se puede quitar, pero sí cambiarle el nombre.` };
     }
     for (const o of opciones) if (o.original && o.original !== o.texto && antes.includes(o.original)) cambiosRespuestas.push({ preguntaId: p.id, de: o.original, a: o.texto });
-    nuevas.push({ ...p, ...comun, corto: corto || p.corto });
+    // El título de las gráficas: vacío, se usa el texto de la pregunta. Antes, al borrarlo regresaba el viejo, y al
+    // cambiar el texto de la pregunta se quedaba el título de la pregunta anterior (el tablero mostraba el título de la
+    // pregunta de ejemplo sobre respuestas de otra pregunta). Si cambió el texto y el título no se tocó, se suelta.
+    const tituloViejo = texto !== p.texto && corto === (p.corto ?? "");
+    nuevas.push({ ...p, ...comun, corto: corto && !tituloViejo ? corto : null });
   }
 
   // «Una encuesta de dos preguntas» tiene que decir cuántas hay de verdad.
