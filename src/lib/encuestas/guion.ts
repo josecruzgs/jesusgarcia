@@ -96,11 +96,13 @@ export const TURNO = { turn_timeout: 6, turn_eagerness: "normal", silence_end_ca
  * palabras de las opciones no interrumpen: la asistente termina de leer y entonces escucha.
  */
 export function palabrasSinInterrupcion(c: CuestionarioActivo) {
+  // ElevenLabs rechaza el agente entero si algún término pasa de 20 caracteres: las opciones largas solo aportan sus palabras.
   const t = new Set<string>();
+  const sumar = (s: string) => { const x = s.trim(); if (x && x.length <= 20) t.add(x); };
   for (const p of c.preguntas)
     for (const o of leerOpciones(p.opciones)) {
-      t.add(o);
-      for (const w of o.split(/\s+/)) if (w.length >= 3) t.add(w);
+      sumar(o);
+      for (const w of o.split(/\s+/)) if (w.length >= 3) sumar(w);
     }
   return [...t].slice(0, 80);
 }
